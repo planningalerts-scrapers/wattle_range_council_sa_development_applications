@@ -372,8 +372,18 @@ async function parsePdf(url: string) {
 
         // Construct a text element for each item from the parsed PDF information.
 
-        let textContent = await page.getTextContent();
         let viewport = await page.getViewport(1.0);
+        let textContent = await page.getTextContent({
+			normalizeWhitespace: true,
+			combineTextItems: false
+		});
+        let operators = await page.getOperatorList();
+        for (let index = 0; index < operators.fnArray.length; index++) {
+            if (operators.fnArray[index] !== pdfjs.OPS.constructPath)
+                continue;
+            console.log(`${operators.argsArray[index][0][0]}     ${operators.argsArray[index][1][0]} ${operators.argsArray[index][1][1]} ${operators.argsArray[index][1][2]} ${operators.argsArray[index][1][3]}`);
+        }
+
         let elements: Element[] = textContent.items.map(item => {
             let transform = pdfjs.Util.transform(viewport.transform, item.transform);
 
@@ -383,6 +393,10 @@ async function parsePdf(url: string) {
             // based on the transform matrix.
 
             let workaroundHeight = Math.sqrt(transform[2] * transform[2] + transform[3] * transform[3]);
+if (item.str.includes("GYSBER")) {
+//    console.log(item.str);
+}
+console.log(`            DrawText(e.Graphics, "${item.str}", ${transform[4]}f, ${transform[5]}f, ${item.width}f, ${workaroundHeight}f);`);
             return { text: item.str, x: transform[4], y: transform[5], width: item.width, height: workaroundHeight };
         });
 
@@ -393,9 +407,9 @@ async function parsePdf(url: string) {
 
         // Ignore the page number (the last element on the page).  Otherwise this will end up as
         // part of a description.
-
-        if (/[0-9]+/.test(elements[elements.length - 1].text) && Number(elements[elements.length - 1].text) < 1000)
-            elements.pop();
+        //
+        // if (/[0-9]+/.test(elements[elements.length - 1].text) && Number(elements[elements.length - 1].text) < 1000)
+        //     elements.pop();
 
         // Find the main column heading elements.
 
@@ -405,7 +419,9 @@ async function parsePdf(url: string) {
         let locationElement = elements.find(element => element.text.trim() === "LOCATION");
         let descriptionElement = elements.find(element => element.text.trim() === "DESCRIPTION");
         let decisionElement = elements.find(element => element.text.trim() === "DECISION");
-
+        let proposalElement = undefined;
+        let referralsElement = undefined;
+        
         // if (applicantElement === undefined) {
         //     let elementSummary = elements.map(element => `[${element.text}]`).join("");
         //     console.log(`No development applications can be parsed from the current page because the \"Applicant\" column heading was not found.  Elements: ${elementSummary}`);
@@ -493,8 +509,8 @@ async function main() {
     // Read the files containing all possible suburb names.
 
     SuburbNames = {};
-    for (let suburb of fs.readFileSync("suburbnames.txt").toString().replace(/\r/g, "").trim().split("\n"))
-        SuburbNames[suburb.split(",")[0]] = suburb.split(",")[1];
+    // for (let suburb of fs.readFileSync("suburbnames.txt").toString().replace(/\r/g, "").trim().split("\n"))
+    //     SuburbNames[suburb.split(",")[0]] = suburb.split(",")[1];
 
     // Retrieve the page that contains the links to the PDFs.
 
@@ -528,6 +544,9 @@ async function main() {
         selectedPdfUrls.push(pdfUrls[getRandom(1, pdfUrls.length)]);
     if (getRandom(0, 2) === 0)
         selectedPdfUrls.reverse();
+
+console.log("Testing PDF.");
+selectedPdfUrls = [ "https://www.wattlerange.sa.gov.au/webdata/resources/files/Stats%20March%2018.pdf" ];
 
     for (let pdfUrl of selectedPdfUrls) {
         console.log(`Parsing document: ${pdfUrl}`);
