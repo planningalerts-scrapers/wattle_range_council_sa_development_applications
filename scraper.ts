@@ -373,15 +373,18 @@ async function parsePdf(url: string) {
         // Construct a text element for each item from the parsed PDF information.
 
         let viewport = await page.getViewport(1.0);
-        let textContent = await page.getTextContent({
-			normalizeWhitespace: true,
-			combineTextItems: false
-		});
+        let textContent = await page.getTextContent();
         let operators = await page.getOperatorList();
+
         for (let index = 0; index < operators.fnArray.length; index++) {
             if (operators.fnArray[index] !== pdfjs.OPS.constructPath)
                 continue;
-            console.log(`${operators.argsArray[index][0][0]}     ${operators.argsArray[index][1][0]} ${operators.argsArray[index][1][1]} ${operators.argsArray[index][1][2]} ${operators.argsArray[index][1][3]}`);
+            let x = operators.argsArray[index][1][1];
+            let y = operators.argsArray[index][1][0];
+            let width = operators.argsArray[index][1][3];
+            let height = operators.argsArray[index][1][2];
+
+            console.log(`            Draw(e.Graphics, ${x}f, ${y}f, ${width}f, ${height}f);`);
         }
 
         let elements: Element[] = textContent.items.map(item => {
@@ -393,11 +396,14 @@ async function parsePdf(url: string) {
             // based on the transform matrix.
 
             let workaroundHeight = Math.sqrt(transform[2] * transform[2] + transform[3] * transform[3]);
-if (item.str.includes("GYSBER")) {
-//    console.log(item.str);
-}
-console.log(`            DrawText(e.Graphics, "${item.str}", ${transform[4]}f, ${transform[5]}f, ${item.width}f, ${workaroundHeight}f);`);
-            return { text: item.str, x: transform[4], y: transform[5], width: item.width, height: workaroundHeight };
+
+            let x = transform[4];
+            let y = transform[5] - workaroundHeight;
+            let width = item.width;
+            let height = workaroundHeight;
+console.log(`            DrawText(e.Graphics, "${item.str}", ${x}f, ${y}f, ${width}f, ${height}f);`);
+
+            return { text: item.str, x: x, y: y, width: width, height: height };
         });
 
         // Sort the elements by Y co-ordinate and then by X co-ordinate.
