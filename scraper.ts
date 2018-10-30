@@ -376,6 +376,10 @@ async function parsePdf(url: string) {
         let textContent = await page.getTextContent();
         let operators = await page.getOperatorList();
 
+        // Find the cells as delineated by lines.
+
+        let cells: Rectangle[] = [];
+
         for (let index = 0; index < operators.fnArray.length; index++) {
             if (operators.fnArray[index] !== pdfjs.OPS.constructPath)
                 continue;
@@ -384,8 +388,13 @@ async function parsePdf(url: string) {
             let width = operators.argsArray[index][1][3];
             let height = operators.argsArray[index][1][2];
 
+            cells.push({x: x, y: y, width: width, height: height});
+
             console.log(`            Draw(e.Graphics, ${x}f, ${y}f, ${width}f, ${height}f);`);
         }
+
+        let cellComparer = (a, b) => (Math.abs(a.y - b.y) < 1) ? ((a.x > b.x) ? 1 : ((a.x < b.x) ? -1 : 0)) : ((a.y > b.y) ? 1 : -1);
+        cells.sort(cellComparer);
 
         let elements: Element[] = textContent.items.map(item => {
             let transform = pdfjs.Util.transform(viewport.transform, item.transform);
