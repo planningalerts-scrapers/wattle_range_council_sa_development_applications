@@ -373,7 +373,7 @@ async function parsePdf(url: string) {
         // Construct a text element for each item from the parsed PDF information.
 
         let viewport = await page.getViewport(1.0);
-        let textContent = await page.getTextContent();
+        let textContent = await page.getTextContent({ disableCombineTextItems: true, combineTextItems: false, combineTextItem: false });
         let operators = await page.getOperatorList();
 
         // Find the cells as delineated by lines.
@@ -392,6 +392,8 @@ async function parsePdf(url: string) {
 
             console.log(`            Draw(e.Graphics, ${x}f, ${y}f, ${width}f, ${height}f);`);
         }
+
+        // Sort the elements by approximate Y co-ordinate and then by X co-ordinate.
 
         let cellComparer = (a, b) => (Math.abs(a.y - b.y) < 1) ? ((a.x > b.x) ? 1 : ((a.x < b.x) ? -1 : 0)) : ((a.y > b.y) ? 1 : -1);
         cells.sort(cellComparer);
@@ -415,6 +417,17 @@ console.log(`            DrawText(e.Graphics, "${item.str}", ${x}f, ${y}f, ${wid
             return { text: item.str, x: x, y: y, width: width, height: height };
         });
 
+        // Find the cell to which each element belongs.  An element may extend across several
+        // cells (because the PDF parsing may join together multiple sections of text, just with
+        // multiple intervening spaces; see addFakeSpaces in pdf.worker.js of pdf.js).
+
+        for (let element of elements) {
+            let ownerCell = undefined;
+            for (let cell of cells)
+                if (element.y >= cell.y && element.y < cell.y + cell.height)
+                    if (ownerCell === undefined || Math.abs(element.x - cell.x) < Math.abs(ownerCell.x - cell.x))
+                        ownerCell = cell;
+        }
         // Sort the elements by Y co-ordinate and then by X co-ordinate.
 
         let elementComparer = (a, b) => (a.y > b.y) ? 1 : ((a.y < b.y) ? -1 : ((a.x > b.x) ? 1 : ((a.x < b.x) ? -1 : 0)));
