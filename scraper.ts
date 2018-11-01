@@ -76,11 +76,11 @@ interface Rectangle {
     height: number
 }
 
-// An element (consisting of text and a bounding rectangle) in a PDF document.
+// An element (consisting of text and intersecting cells) in a PDF document.
 
 interface Element extends Rectangle {
     text: string,
-    confidence: number
+    cells: Rectangle[]
 }
 
 // Gets the highest Y co-ordinate of all elements that are considered to be in the same row as
@@ -109,6 +109,15 @@ function intersect(rectangle1: Rectangle, rectangle2: Rectangle): Rectangle {
         return { x: x1, y: y1, width: x2 - x1, height: y2 - y1 };
     else
         return { x: 0, y: 0, width: 0, height: 0 };
+}
+
+// Determines whether containerRectangle completely contains containedRectangle.
+
+function contains(containerRectangle: Rectangle, containedRectangle: Rectangle) {
+    return containerRectangle.x <= containedRectangle.x &&
+        containerRectangle.y <= containedRectangle.y &&
+        containerRectangle.x + containerRectangle.width >= containedRectangle.x + containedRectangle.width &&
+        containerRectangle.y + containerRectangle.height >= containedRectangle.y + containedRectangle.height;
 }
 
 // Calculates the area of a rectangle.
@@ -147,7 +156,7 @@ function getVerticalOverlapPercentage(element1: Element, element2: Element) {
 // appear after a large horizontal gap).
 
 function getRightElement(elements: Element[], element: Element) {
-    let closestElement: Element = { text: undefined, confidence: 0, x: Number.MAX_VALUE, y: Number.MAX_VALUE, width: 0, height: 0 };
+    let closestElement: Element = { text: undefined, cells: [], x: Number.MAX_VALUE, y: Number.MAX_VALUE, width: 0, height: 0 };
     for (let rightElement of elements)
         if (isVerticalOverlap(element, rightElement) &&  // ensure that there is at least some vertical overlap
             getVerticalOverlapPercentage(element, rightElement) > 50 &&  // avoid extremely tall elements (ensure at least 50% overlap)
@@ -373,12 +382,13 @@ async function parsePdf(url: string) {
         // Construct a text element for each item from the parsed PDF information.
 
         let viewport = await page.getViewport(1.0);
-        let textContent = await page.getTextContent({ disableCombineTextItems: true, combineTextItems: false, combineTextItem: false });
+        let textContent = await page.getTextContent();
         let operators = await page.getOperatorList();
 
-        // Find the cells as delineated by lines.
+        // Find the lines.  Each line is actually constructed using a rectangle with a very short
+        // height or a  very narrow width.
 
-        let cells: Rectangle[] = [];
+        let lines: Rectangle[] = [];
 
         for (let index = 0; index < operators.fnArray.length; index++) {
             if (operators.fnArray[index] !== pdfjs.OPS.constructPath)
@@ -388,11 +398,14 @@ async function parsePdf(url: string) {
             let width = operators.argsArray[index][1][3];
             let height = operators.argsArray[index][1][2];
 
-            cells.push({x: x, y: y, width: width, height: height});
+            lines.push({x: x, y: y, width: width, height: height});
 
             console.log(`            Draw(e.Graphics, ${x}f, ${y}f, ${width}f, ${height}f);`);
         }
 
+        // Convert the lines into rectangles.
+
+        
         // Sort the elements by approximate Y co-ordinate and then by X co-ordinate.
 
         let cellComparer = (a, b) => (Math.abs(a.y - b.y) < 1) ? ((a.x > b.x) ? 1 : ((a.x < b.x) ? -1 : 0)) : ((a.y > b.y) ? 1 : -1);
@@ -414,7 +427,7 @@ async function parsePdf(url: string) {
             let height = workaroundHeight;
 console.log(`            DrawText(e.Graphics, "${item.str}", ${x}f, ${y}f, ${width}f, ${height}f);`);
 
-            return { text: item.str, x: x, y: y, width: width, height: height };
+            return { text: item.str, cells: [], x: x, y: y, width: width, height: height };
         });
 
         // Find the cell to which each element belongs.  An element may extend across several
@@ -422,12 +435,33 @@ console.log(`            DrawText(e.Graphics, "${item.str}", ${x}f, ${y}f, ${wid
         // multiple intervening spaces; see addFakeSpaces in pdf.worker.js of pdf.js).
 
         for (let element of elements) {
-            let ownerCell = undefined;
-            for (let cell of cells)
-                if (element.y >= cell.y && element.y < cell.y + cell.height)
-                    if (ownerCell === undefined || Math.abs(element.x - cell.x) < Math.abs(ownerCell.x - cell.x))
-                        ownerCell = cell;
+            for (let cell of cells) {
+                // Check if the element is entirely within the cell (this is the simple case).
+
+                if (contains(cell, element)) {
+                    element.cells = [ cell ];
+                    break;
+                }
+
+                // If the element intersects several cells then add those cells to the element
+                // (the element will then later be parsed and broken up across those cells).
+
+                if (getArea(intersect(cell, element)) > 0)
+                    element.cells.push(cell);
+            }
+            // if (element.y >= cell.y && element.y < cell.y + cell.height)
+            //     if (ownerCell === undefined || Math.abs(element.x - cell.x) < Math.abs(ownerCell.x - cell.x))
+            //         ownerCell = cell;
         }
+
+        // Parse any elements that intersect more than one cell.
+
+        for (let element of elements) {
+            if (element.cells !== undefined && element.cells.length >= 2) {
+
+            }
+        }
+
         // Sort the elements by Y co-ordinate and then by X co-ordinate.
 
         let elementComparer = (a, b) => (a.y > b.y) ? 1 : ((a.y < b.y) ? -1 : ((a.x > b.x) ? 1 : ((a.x < b.x) ? -1 : 0)));
@@ -477,7 +511,7 @@ console.log(`            DrawText(e.Graphics, "${item.str}", ${x}f, ${y}f, ${wid
             let startElement = startElements[index];
             let raisedStartElement: Element = {
                 text: startElement.text,
-                confidence: startElement.confidence,
+                cells: [],
                 x: startElement.x,
                 y: startElement.y - startElement.height / 2,  // leeway
                 width: startElement.width,
