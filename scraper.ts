@@ -140,7 +140,7 @@ function calculateDistance(element1: Element, element2: Element) {
     let point2 = { x: element2.x, y: element2.y + element2.height / 2 };
     if (point2.x < point1.x - element1.width / 5)  // arbitrary overlap factor of 20% (ie. ignore elements that overlap too much in the horizontal direction)
         return Number.MAX_VALUE;
-    return (point2.x - point1.x) * (point2.x - point1.x) + (point2.y - point1.y) * (point2.y - point1.y);
+    return (point2.x - point1.x) ** 2 + (point2.y - point1.y) ** 2;
 }
 
 // Determines whether there is vertical overlap between two elements.
@@ -407,7 +407,7 @@ async function parsePdf(url: string) {
 
             lines.push({x: x, y: y, width: width, height: height});
 
-            console.log(`            Draw(e.Graphics, ${x}f, ${y}f, ${width}f, ${height}f);`);
+            // console.log(`            Draw(e.Graphics, ${x}f, ${y}f, ${width}f, ${height}f);`);
         }
 
         // Convert the lines into a grid of points.
@@ -475,10 +475,23 @@ async function parsePdf(url: string) {
             // Find the next closest point in the X direction (moving across horizontally with
             // approximately the same Y co-ordinate).
 
+            let closestRightPoint = points.reduce(
+                ((previous, current) => (Math.abs(current.y - point.y) < 1 && current.x > point.x && (previous === undefined || (current.x - point.x < previous.x - point.x))) ? current : previous),
+                undefined);
+
             // Find the next closest point in the Y direction (moving down vertically with
             // approximately the same X co-ordinate).
 
+            let closestDownPoint = points.reduce(
+                ((previous, current) => (Math.abs(current.x - point.x) < 1 && current.y > point.y && (previous === undefined || (current.y - point.y < previous.y - point.y))) ? current : previous),
+                undefined);
 
+            // Construct a rectangle from the found points.
+
+            if (closestRightPoint !== undefined && closestDownPoint !== undefined) {
+                let cell: Rectangle = { x: point.x, y: point.y, width: closestRightPoint.x - point.x, height: closestDownPoint.y - point.y };
+                console.log(`            DrawRectangle(e.Graphics, ${cell.x}f, ${cell.y}f, ${cell.width}f, ${cell.height}f);`);
+            }
         }
 
         // Sort the elements by approximate Y co-ordinate and then by X co-ordinate.
