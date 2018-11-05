@@ -67,6 +67,13 @@ async function insertRow(database, developmentApplication) {
     });
 }
 
+// A 2D point.
+
+interface Point {
+    x: number,
+    y: number
+}
+
 // A bounding rectangle.
 
 interface Rectangle {
@@ -403,9 +410,77 @@ async function parsePdf(url: string) {
             console.log(`            Draw(e.Graphics, ${x}f, ${y}f, ${width}f, ${height}f);`);
         }
 
-        // Convert the lines into rectangles.
+        // Convert the lines into a grid of points.
 
-        
+        let points: Point[] = [];
+
+        for (let line of lines) {
+            // Ignore thick lines (since these are probably intented to be drawn as rectangles).
+            // And ignore short lines (because these are probably of no consequence).
+
+            if ((line.width > 2 && line.height > 2) || (line.width <= 2 && line.height < 10) || (line.height <= 2 && line.width < 10))
+                continue;
+
+            // // Find a line with the same (or close to the same) starting point.  The two lines can
+            // // be used to construct a rectangle.
+            //
+            // let startPoint: Point = { x: line1.x, y: line1.y };
+            // let endPoint: Point = (line1.height <= 2) ? { x: line1.x + line1.width, y: line1.y } : { x: line1.x, y: line1.y + line1.height };
+
+            let startPoint: Point = { x: line.x, y: line.y };
+            if (!points.some(point => (startPoint.x - point.x) ** 2 + (startPoint.y - point.y) ** 2 < 1))
+                points.push(startPoint);
+
+            let endPoint: Point = undefined;
+            if (line.height <= 2) { // horizontal line
+                endPoint = { x: line.x + line.width, y: line.y };
+            } else { // vertical line
+                endPoint = { x: line.x, y: line.y + line.height };
+            }
+
+            if (!points.some(point => (endPoint.x - point.x) ** 2 + (endPoint.y - point.y) ** 2 < 1))
+                points.push(endPoint);
+
+            // for (let line2 of lines) {
+            //     // Ignore thick lines (since these are probably intented to be drawn as rectangles).
+            //     // And ignore short lines (because these are probably of no consequence).
+            //
+            //     if ((line2.width > 2 && line2.height > 2) || (line2.width <= 2 && line2.height < 10) || (line2.height <= 2 && line2.width < 10))
+            //         continue;
+            //
+            //     // Ignore the same line.
+            //
+            //     if (line1.x === line2.x && line1.y === line2.y && line1.width === line2.width && line1.height === line2.height)
+            //         continue;
+            //
+            //     let startLine2: Point = { x: line2.x, y: line2.y };
+            //     let endLine2: Point = (line2.height <= 2) ? { x: line2.x + line2.width, y: line2.y } : { x: line2.x, y: line2.y + line2.height };
+            //
+            //     let distance = (startLine2.x - startLine1.x) * (startLine2.x - startLine1.x) + (startLine2.y - startLine1.y) * (startLine2.y - startLine1.y);
+            //     if (distance < 2) {
+            //         cells.push({ x: startLine1.x, y: startLine1.y, width: Math.max(line1.width, line2.width), height: Math.max(line1.height, line2.height)});
+            //         console.log(`            DrawRectangle(e.Graphics, ${startLine1.x}f, ${startLine1.y}f, ${Math.max(line1.width, line2.width)}f, ${Math.max(line1.height, line2.height)}f);`);
+            //     }
+            // }
+        }
+
+        for (let point of points)
+            console.log(`            DrawPoint(e.Graphics, ${point.x}f, ${point.y}f);`);
+
+        // Construct cells based on the grid of points.
+
+        let cells: Rectangle[] = [];
+
+        for (let point of points) {
+            // Find the next closest point in the X direction (moving across horizontally with
+            // approximately the same Y co-ordinate).
+
+            // Find the next closest point in the Y direction (moving down vertically with
+            // approximately the same X co-ordinate).
+
+
+        }
+
         // Sort the elements by approximate Y co-ordinate and then by X co-ordinate.
 
         let cellComparer = (a, b) => (Math.abs(a.y - b.y) < 1) ? ((a.x > b.x) ? 1 : ((a.x < b.x) ? -1 : 0)) : ((a.y > b.y) ? 1 : -1);
