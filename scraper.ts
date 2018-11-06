@@ -421,12 +421,6 @@ async function parsePdf(url: string) {
             if ((line.width > 2 && line.height > 2) || (line.width <= 2 && line.height < 10) || (line.height <= 2 && line.width < 10))
                 continue;
 
-            // // Find a line with the same (or close to the same) starting point.  The two lines can
-            // // be used to construct a rectangle.
-            //
-            // let startPoint: Point = { x: line1.x, y: line1.y };
-            // let endPoint: Point = (line1.height <= 2) ? { x: line1.x + line1.width, y: line1.y } : { x: line1.x, y: line1.y + line1.height };
-
             let startPoint: Point = { x: line.x, y: line.y };
             if (!points.some(point => (startPoint.x - point.x) ** 2 + (startPoint.y - point.y) ** 2 < 1))
                 points.push(startPoint);
@@ -440,28 +434,6 @@ async function parsePdf(url: string) {
 
             if (!points.some(point => (endPoint.x - point.x) ** 2 + (endPoint.y - point.y) ** 2 < 1))
                 points.push(endPoint);
-
-            // for (let line2 of lines) {
-            //     // Ignore thick lines (since these are probably intented to be drawn as rectangles).
-            //     // And ignore short lines (because these are probably of no consequence).
-            //
-            //     if ((line2.width > 2 && line2.height > 2) || (line2.width <= 2 && line2.height < 10) || (line2.height <= 2 && line2.width < 10))
-            //         continue;
-            //
-            //     // Ignore the same line.
-            //
-            //     if (line1.x === line2.x && line1.y === line2.y && line1.width === line2.width && line1.height === line2.height)
-            //         continue;
-            //
-            //     let startLine2: Point = { x: line2.x, y: line2.y };
-            //     let endLine2: Point = (line2.height <= 2) ? { x: line2.x + line2.width, y: line2.y } : { x: line2.x, y: line2.y + line2.height };
-            //
-            //     let distance = (startLine2.x - startLine1.x) * (startLine2.x - startLine1.x) + (startLine2.y - startLine1.y) * (startLine2.y - startLine1.y);
-            //     if (distance < 2) {
-            //         cells.push({ x: startLine1.x, y: startLine1.y, width: Math.max(line1.width, line2.width), height: Math.max(line1.height, line2.height)});
-            //         console.log(`            DrawRectangle(e.Graphics, ${startLine1.x}f, ${startLine1.y}f, ${Math.max(line1.width, line2.width)}f, ${Math.max(line1.height, line2.height)}f);`);
-            //     }
-            // }
         }
 
         for (let point of points)
@@ -491,6 +463,7 @@ async function parsePdf(url: string) {
             if (closestRightPoint !== undefined && closestDownPoint !== undefined) {
                 let cell: Rectangle = { x: point.x, y: point.y, width: closestRightPoint.x - point.x, height: closestDownPoint.y - point.y };
                 console.log(`            DrawRectangle(e.Graphics, ${cell.x}f, ${cell.y}f, ${cell.width}f, ${cell.height}f);`);
+                cells.push(cell);
             }
         }
 
@@ -537,9 +510,6 @@ console.log(`            DrawText(e.Graphics, "${item.str}", ${x}f, ${y}f, ${wid
                 if (getArea(intersect(cell, element)) > 0)
                     element.cells.push(cell);
             }
-            // if (element.y >= cell.y && element.y < cell.y + cell.height)
-            //     if (ownerCell === undefined || Math.abs(element.x - cell.x) < Math.abs(ownerCell.x - cell.x))
-            //         ownerCell = cell;
         }
 
         // Parse any elements that intersect more than one cell.
