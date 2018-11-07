@@ -467,10 +467,7 @@ async function parsePdf(url: string) {
             }
         }
 
-        // Sort the elements by approximate Y co-ordinate and then by X co-ordinate.
-
-        let cellComparer = (a, b) => (Math.abs(a.y - b.y) < 1) ? ((a.x > b.x) ? 1 : ((a.x < b.x) ? -1 : 0)) : ((a.y > b.y) ? 1 : -1);
-        cells.sort(cellComparer);
+        // Find all the text elements.
 
         let elements: Element[] = textContent.items.map(item => {
             let transform = pdfjs.Util.transform(viewport.transform, item.transform);
@@ -491,8 +488,13 @@ console.log(`            DrawText(e.Graphics, "${item.str}", ${x}f, ${y}f, ${wid
             return { text: item.str, cells: [], x: x, y: y, width: width, height: height };
         });
 
+        // Sort the text elements by approximate Y co-ordinate and then by X co-ordinate.
+
+        let elementComparer = (a, b) => (Math.abs(a.y - b.y) < 1) ? ((a.x > b.x) ? 1 : ((a.x < b.x) ? -1 : 0)) : ((a.y > b.y) ? 1 : -1);
+        elements.sort(elementComparer);
+
         // Find the cell to which each element belongs.  An element may extend across several
-        // cells (because the PDF parsing may join together multiple sections of text, just with
+        // cells (because the PDF parsing may join together multiple sections of text, using
         // multiple intervening spaces; see addFakeSpaces in pdf.worker.js of pdf.js).
 
         for (let element of elements) {
@@ -500,7 +502,7 @@ console.log(`            DrawText(e.Graphics, "${item.str}", ${x}f, ${y}f, ${wid
                 // Check if the element is entirely within the cell (this is the simple case).
 
                 if (contains(cell, element)) {
-                    element.cells = [ cell ];
+                    element.cells.push(cell);
                     break;
                 }
 
@@ -512,6 +514,18 @@ console.log(`            DrawText(e.Graphics, "${item.str}", ${x}f, ${y}f, ${wid
             }
         }
 
+        // Find the heading elements.
+
+        let assessmentElement = elements.find(element => element.text.trim() === "ASSESS" && element.cells.length >= 1);
+        let vgNumberElement = elements.find(element => element.text.trim() === "VG NUMBER" && element.cells.length >= 1);
+        let applicationNumberElement = elements.find(element => element.text.trim() === "DA NUMBER" && element.cells.length >= 1);
+        let applicantNumberElement = elements.find(element => element.text.trim() === "APPLICANT" && element.cells.length >= 1);
+        let ownerElement = elements.find(element => element.text.trim() === "OWNER" && element.cells.length >= 1);
+        let builderElement = elements.find(element => element.text.trim() === "BUILDER" && element.cells.length >= 1);
+        let locationElement = elements.find(element => element.text.trim() === "LOCATION" && element.cells.length >= 1);
+        let descriptionElement = elements.find(element => element.text.trim() === "DESCRIPTION" && element.cells.length >= 1);
+        let decisionDateElement = elements.find(element => element.text.trim() === "DECISION" && element.cells.length >= 1);
+
         // Parse any elements that intersect more than one cell.
 
         for (let element of elements) {
@@ -521,9 +535,9 @@ console.log(`            DrawText(e.Graphics, "${item.str}", ${x}f, ${y}f, ${wid
         }
 
         // Sort the elements by Y co-ordinate and then by X co-ordinate.
-
-        let elementComparer = (a, b) => (a.y > b.y) ? 1 : ((a.y < b.y) ? -1 : ((a.x > b.x) ? 1 : ((a.x < b.x) ? -1 : 0)));
-        elements.sort(elementComparer);
+        //
+        // let elementComparer = (a, b) => (a.y > b.y) ? 1 : ((a.y < b.y) ? -1 : ((a.x > b.x) ? 1 : ((a.x < b.x) ? -1 : 0)));
+        // elements.sort(elementComparer);
 
         // Ignore the page number (the last element on the page).  Otherwise this will end up as
         // part of a description.
@@ -532,15 +546,15 @@ console.log(`            DrawText(e.Graphics, "${item.str}", ${x}f, ${y}f, ${wid
         //     elements.pop();
 
         // Find the main column heading elements.
-
-        let applicationElement = elements.find(element => element.text.trim() === "DA NUMBER");
-        let applicantElement = elements.find(element => element.text.trim() === "APPLICANT");
-        let ownerElement = elements.find(element => element.text.trim() === "OWNER");
-        let locationElement = elements.find(element => element.text.trim() === "LOCATION");
-        let descriptionElement = elements.find(element => element.text.trim() === "DESCRIPTION");
-        let decisionElement = elements.find(element => element.text.trim() === "DECISION");
-        let proposalElement = undefined;
-        let referralsElement = undefined;
+        //
+        // let applicationElement = elements.find(element => element.text.trim() === "DA NUMBER");
+        // let applicantElement = elements.find(element => element.text.trim() === "APPLICANT");
+        // let ownerElement = elements.find(element => element.text.trim() === "OWNER");
+        // let locationElement = elements.find(element => element.text.trim() === "LOCATION");
+        // let descriptionElement = elements.find(element => element.text.trim() === "DESCRIPTION");
+        // let decisionElement = elements.find(element => element.text.trim() === "DECISION");
+        // let proposalElement = undefined;
+        // let referralsElement = undefined;
         
         // if (applicantElement === undefined) {
         //     let elementSummary = elements.map(element => `[${element.text}]`).join("");
@@ -586,22 +600,22 @@ console.log(`            DrawText(e.Graphics, "${item.str}", ${x}f, ${y}f, ${wid
         // current page of the PDF document).  If the same application number is encountered a
         // second time add a suffix to the application number so it is unique (and so will be
         // inserted into the database later instead of being ignored).
-
-        for (let applicationElementGroup of applicationElementGroups) {
-            let developmentApplication = parseApplicationElements(applicationElementGroup.elements, applicationElementGroup.startElement, applicantElement, applicationElement, proposalElement, referralsElement, url);
-            if (developmentApplication !== undefined) {
-                let suffix = 0;
-                let applicationNumber = developmentApplication.applicationNumber;
-                while (developmentApplications
-                    .some(otherDevelopmentApplication =>
-                        otherDevelopmentApplication.applicationNumber === developmentApplication.applicationNumber &&
-                            (otherDevelopmentApplication.address !== developmentApplication.address ||
-                            otherDevelopmentApplication.description !== developmentApplication.description ||
-                            otherDevelopmentApplication.receivedDate !== developmentApplication.receivedDate)))
-                    developmentApplication.applicationNumber = `${applicationNumber} (${++suffix})`;  // add a unique suffix
-                developmentApplications.push(developmentApplication);
-            }
-        }
+        //
+        // for (let applicationElementGroup of applicationElementGroups) {
+        //     let developmentApplication = parseApplicationElements(applicationElementGroup.elements, applicationElementGroup.startElement, applicantElement, applicationElement, proposalElement, referralsElement, url);
+        //     if (developmentApplication !== undefined) {
+        //         let suffix = 0;
+        //         let applicationNumber = developmentApplication.applicationNumber;
+        //         while (developmentApplications
+        //             .some(otherDevelopmentApplication =>
+        //                 otherDevelopmentApplication.applicationNumber === developmentApplication.applicationNumber &&
+        //                     (otherDevelopmentApplication.address !== developmentApplication.address ||
+        //                     otherDevelopmentApplication.description !== developmentApplication.description ||
+        //                     otherDevelopmentApplication.receivedDate !== developmentApplication.receivedDate)))
+        //             developmentApplication.applicationNumber = `${applicationNumber} (${++suffix})`;  // add a unique suffix
+        //         developmentApplications.push(developmentApplication);
+        //     }
+        // }
     }
 
     return developmentApplications;
