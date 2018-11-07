@@ -159,6 +159,28 @@ function getVerticalOverlapPercentage(element1: Element, element2: Element) {
     return (y2 < y1) ? 0 : (((y2 - y1) * 100) / element2.height);
 }
 
+// Gets the percentage of horizontal overlap between two rectangles (0 means no overlap and 100
+// means 100% overlap).
+
+function getHorizontalOverlapPercentage(rectangle1: Rectangle, rectangle2: Rectangle) {
+    if (rectangle1 === undefined || rectangle2 === undefined)
+        return 0;
+
+    let startX1 = rectangle1.x;
+    let endX1 = rectangle1.x + rectangle1.width;
+
+    let startX2 = rectangle2.x;
+    let endX2 = rectangle2.x + rectangle2.width;
+
+    if (startX1 >= endX2 || endX1 <= startX2 || rectangle1.width === 0 || rectangle2.width === 0)
+        return 0;
+
+    let intersectionWidth = Math.min(endX1, endX2) - Math.max(startX1, startX2);
+    let unionWidth = Math.max(endX1, endX2) - Math.min(startX1, startX2);
+
+    return (intersectionWidth * 100) / unionWidth;
+}
+
 // Gets the element immediately to the right of the specified element (but ignores elements that
 // appear after a large horizontal gap).
 
@@ -516,21 +538,57 @@ console.log(`            DrawText(e.Graphics, "${item.str}", ${x}f, ${y}f, ${wid
 
         // Find the heading elements.
 
-        let assessmentElement = elements.find(element => element.text.trim() === "ASSESS" && element.cells.length >= 1);
-        let vgNumberElement = elements.find(element => element.text.trim() === "VG NUMBER" && element.cells.length >= 1);
-        let applicationNumberElement = elements.find(element => element.text.trim() === "DA NUMBER" && element.cells.length >= 1);
-        let applicantNumberElement = elements.find(element => element.text.trim() === "APPLICANT" && element.cells.length >= 1);
-        let ownerElement = elements.find(element => element.text.trim() === "OWNER" && element.cells.length >= 1);
-        let builderElement = elements.find(element => element.text.trim() === "BUILDER" && element.cells.length >= 1);
-        let locationElement = elements.find(element => element.text.trim() === "LOCATION" && element.cells.length >= 1);
-        let descriptionElement = elements.find(element => element.text.trim() === "DESCRIPTION" && element.cells.length >= 1);
-        let decisionDateElement = elements.find(element => element.text.trim() === "DECISION" && element.cells.length >= 1);
+        let assessmentElement = elements.find(element => element.text.trim() === "ASSESS" && element.cells.length === 1);
+        let vgNumberElement = elements.find(element => element.text.trim() === "VG NUMBER" && element.cells.length === 1);
+        let applicationNumberElement = elements.find(element => element.text.trim() === "DA NUMBER" && element.cells.length === 1);
+        let applicantNumberElement = elements.find(element => element.text.trim() === "APPLICANT" && element.cells.length === 1);
+        let ownerElement = elements.find(element => element.text.trim() === "OWNER" && element.cells.length === 1);
+        let builderElement = elements.find(element => element.text.trim() === "BUILDER" && element.cells.length === 1);
+        let addressElement = elements.find(element => element.text.trim() === "LOCATION" && element.cells.length === 1);
+        let descriptionElement = elements.find(element => element.text.trim() === "DESCRIPTION" && element.cells.length === 1);
+        let decisionDateElement = elements.find(element => element.text.trim() === "DECISION" && element.cells.length === 1);
+
+        let assessmentCell = (assessmentElement === undefined || assessmentElement.cells.length === 0) ? undefined : assessmentElement.cells[0];
+        let vgNumberCell = (vgNumberElement === undefined || vgNumberElement.cells.length === 0) ? undefined : vgNumberElement.cells[0];
+        let applicationNumberCell = (applicantNumberElement === undefined || applicantNumberElement.cells.length === 0) ? undefined : applicantNumberElement.cells[0];
+        let ownerCell = (ownerElement === undefined || ownerElement.cells.length === 0) ? undefined : ownerElement.cells[0];
+        let builderCell = (builderElement === undefined || builderElement.cells.length === 0) ? undefined : builderElement.cells[0];
+        let addressCell = (addressElement === undefined || addressElement.cells.length === 0) ? undefined : addressElement.cells[0];
+        let descriptionCell = (descriptionElement === undefined || descriptionElement.cells.length === 0) ? undefined : descriptionElement.cells[0];
+        let decisionDateCell = (decisionDateElement === undefined || decisionDateElement.cells.length === 0) ? undefined : decisionDateElement.cells[0];
+
+        if (applicationNumberCell === undefined) {
+            let elementSummary = elements.map(element => `[${element.text}]`).join("");
+            console.log(`No development applications can be parsed from the current page because the "DA NUMBER" column heading was not found.  Elements: ${elementSummary}`);
+            continue;
+        }
+
+        if (addressCell === undefined) {
+            let elementSummary = elements.map(element => `[${element.text}]`).join("");
+            console.log(`No development applications can be parsed from the current page because the "LOCATION" column heading was not found.  Elements: ${elementSummary}`);
+            continue;
+        }
 
         // Parse any elements that intersect more than one cell.
 
         for (let element of elements) {
             if (element.cells !== undefined && element.cells.length >= 2) {
+                // Examine each cell that the element intersects.  In most cases determining which
+                // column heading the first cell falls under will enable the text to be split and
+                // so then allocated to appropriate columns.
 
+                let firstCell = element.cells[0];
+                if (getHorizontalOverlapPercentage(firstCell, assessmentCell) > 90) {
+
+                } else if (getHorizontalOverlapPercentage(firstCell, vgNumberCell) > 90) {
+
+                } else if (getHorizontalOverlapPercentage(firstCell, applicationNumberCell) > 90) {
+
+                }
+
+                for (let cell of element.cells) {
+
+                }
             }
         }
 
