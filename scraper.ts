@@ -536,26 +536,36 @@ console.log(`            DrawText(e.Graphics, "${item.str}", ${x}f, ${y}f, ${wid
             }
         }
 
+        // Remove any elements that have no cells (for example the page heading and the page
+        // number in the footer).
+
+        elements = elements.filter(element => element.cells.length > 0);
+
         // Find the heading elements.
 
         let assessmentElement = elements.find(element => element.text.trim() === "ASSESS" && element.cells.length === 1);
         let vgNumberElement = elements.find(element => element.text.trim() === "VG NUMBER" && element.cells.length === 1);
         let applicationNumberElement = elements.find(element => element.text.trim() === "DA NUMBER" && element.cells.length === 1);
-        let applicantNumberElement = elements.find(element => element.text.trim() === "APPLICANT" && element.cells.length === 1);
+        let applicantElement = elements.find(element => element.text.trim() === "APPLICANT" && element.cells.length === 1);
         let ownerElement = elements.find(element => element.text.trim() === "OWNER" && element.cells.length === 1);
         let builderElement = elements.find(element => element.text.trim() === "BUILDER" && element.cells.length === 1);
         let addressElement = elements.find(element => element.text.trim() === "LOCATION" && element.cells.length === 1);
         let descriptionElement = elements.find(element => element.text.trim() === "DESCRIPTION" && element.cells.length === 1);
         let decisionDateElement = elements.find(element => element.text.trim() === "DECISION" && element.cells.length === 1);
+        let valuationElement = elements.find(element => element.text.trim() === "VALUATION" && element.cells.length === 1);
+        let areaElement = elements.find(element => element.text.trim() === "VALUATION" && element.cells.length === 1);
 
-        let assessmentCell = (assessmentElement === undefined || assessmentElement.cells.length === 0) ? undefined : assessmentElement.cells[0];
-        let vgNumberCell = (vgNumberElement === undefined || vgNumberElement.cells.length === 0) ? undefined : vgNumberElement.cells[0];
-        let applicationNumberCell = (applicantNumberElement === undefined || applicantNumberElement.cells.length === 0) ? undefined : applicantNumberElement.cells[0];
-        let ownerCell = (ownerElement === undefined || ownerElement.cells.length === 0) ? undefined : ownerElement.cells[0];
-        let builderCell = (builderElement === undefined || builderElement.cells.length === 0) ? undefined : builderElement.cells[0];
-        let addressCell = (addressElement === undefined || addressElement.cells.length === 0) ? undefined : addressElement.cells[0];
-        let descriptionCell = (descriptionElement === undefined || descriptionElement.cells.length === 0) ? undefined : descriptionElement.cells[0];
-        let decisionDateCell = (decisionDateElement === undefined || decisionDateElement.cells.length === 0) ? undefined : decisionDateElement.cells[0];
+        let assessmentCell = (assessmentElement === undefined) ? undefined : assessmentElement.cells[0];
+        let vgNumberCell = (vgNumberElement === undefined) ? undefined : vgNumberElement.cells[0];
+        let applicationNumberCell = (applicationNumberElement === undefined) ? undefined : applicationNumberElement.cells[0];
+        let applicantCell = (applicantElement === undefined) ? undefined : applicantElement.cells[0];
+        let ownerCell = (ownerElement === undefined) ? undefined : ownerElement.cells[0];
+        let builderCell = (builderElement === undefined) ? undefined : builderElement.cells[0];
+        let addressCell = (addressElement === undefined) ? undefined : addressElement.cells[0];
+        let descriptionCell = (descriptionElement === undefined) ? undefined : descriptionElement.cells[0];
+        let decisionDateCell = (decisionDateElement === undefined) ? undefined : decisionDateElement.cells[0];
+        let valuationCell = (valuationElement === undefined) ? undefined : valuationElement.cells[0];
+        let areaCell = (areaElement === undefined) ? undefined : areaElement.cells[0];
 
         if (applicationNumberCell === undefined) {
             let elementSummary = elements.map(element => `[${element.text}]`).join("");
@@ -584,6 +594,24 @@ console.log(`            DrawText(e.Graphics, "${item.str}", ${x}f, ${y}f, ${wid
 
                 } else if (getHorizontalOverlapPercentage(firstCell, applicationNumberCell) > 90) {
 
+                } else if (getHorizontalOverlapPercentage(firstCell, applicantCell) > 90) {
+
+                } else if (getHorizontalOverlapPercentage(firstCell, ownerCell) > 90) {
+
+                } else if (getHorizontalOverlapPercentage(firstCell, builderCell) > 90) {
+                    
+                } else if (getHorizontalOverlapPercentage(firstCell, addressCell) > 90) {
+                    
+                } else if (getHorizontalOverlapPercentage(firstCell, descriptionCell) > 90) {
+                    
+                } else if (getHorizontalOverlapPercentage(firstCell, decisionDateCell) > 90) {
+                    
+                } else if (getHorizontalOverlapPercentage(firstCell, valuationCell) > 90) {
+                    
+                } else if (getHorizontalOverlapPercentage(firstCell, areaCell) > 90) {
+                    
+                } else {
+                    
                 }
 
                 for (let cell of element.cells) {
@@ -591,6 +619,9 @@ console.log(`            DrawText(e.Graphics, "${item.str}", ${x}f, ${y}f, ${wid
                 }
             }
         }
+
+        // Group the elements into rows.
+
 
         // Sort the elements by Y co-ordinate and then by X co-ordinate.
         //
