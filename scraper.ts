@@ -546,6 +546,17 @@ console.log(`            DrawText(e.Graphics, "${item.str}", ${x}f, ${y}f, ${wid
                 row.push(cell);  // add to an existing row
         }
 
+        // Ensure the rows are sorted by Y co-ordinate and that  the cells in each row are sorted
+        // by X co-ordinate (this is just a safety precaution because the earlier sorting of cells
+        // should have already ensured this).
+
+        let rowComparer = (a, b) => (a.y > b.y) ? 1 : ((a.y < b.y) ? -1 : 0);
+        rows.sort(rowComparer);
+
+        let rowCellComparer = (a, b) => (a.x > b.x) ? 1 : ((a.x < b.x) ? -1 : 0);
+        for (let row of rows)
+            row.sort(rowCellComparer);
+
         // Find the heading cells.
 
         let assessmentCell = cells.find(cell => cell.elements.some(element => element.text.trim() === "ASSESS" && contains(cell, element)));
@@ -575,6 +586,19 @@ console.log(`            DrawText(e.Graphics, "${item.str}", ${x}f, ${y}f, ${wid
         // Parse any elements that intersect more than one cell.
 
         for (let cell of cells) {
+            for (let element of cell.elements) {  // <-- wrong, could process same element twice
+                if (!contains(cell, element)) {  // if element extends outside of the owning cell (perhaps into another cell, perhaps outside of any cell)
+                    // Get all elements that have approximately the same Y co-ordinate in the cell.
+
+                    let ambiguousElements = cell.elements.filter(otherElement => Math.abs(otherElement.y - element.y) < 5);
+                    let text = ambiguousElements.map(element => element.text).join("");
+
+                    // Parse the text.
+
+                    console.log(text);
+                }
+            }
+
             if (cell.elements.some(element => !contains(cell, element))) {
                 // Examine each cell that the element intersects.  In most cases determining which
                 // column heading the first cell falls under will enable the text to be split and
