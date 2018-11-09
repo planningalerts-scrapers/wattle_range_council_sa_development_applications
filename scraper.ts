@@ -86,8 +86,13 @@ interface Rectangle {
 // An element (consisting of text and intersecting cells) in a PDF document.
 
 interface Element extends Rectangle {
-    text: string,
-    cells: Rectangle[]
+    text: string
+}
+
+// A cell in a grid (owning zero, one or more elements).
+
+interface Cell extends Rectangle {
+    elements: Element[]
 }
 
 // Gets the highest Y co-ordinate of all elements that are considered to be in the same row as
@@ -185,7 +190,7 @@ function getHorizontalOverlapPercentage(rectangle1: Rectangle, rectangle2: Recta
 // appear after a large horizontal gap).
 
 function getRightElement(elements: Element[], element: Element) {
-    let closestElement: Element = { text: undefined, cells: [], x: Number.MAX_VALUE, y: Number.MAX_VALUE, width: 0, height: 0 };
+    let closestElement: Element = { text: undefined, x: Number.MAX_VALUE, y: Number.MAX_VALUE, width: 0, height: 0 };
     for (let rightElement of elements)
         if (isVerticalOverlap(element, rightElement) &&  // ensure that there is at least some vertical overlap
             getVerticalOverlapPercentage(element, rightElement) > 50 &&  // avoid extremely tall elements (ensure at least 50% overlap)
@@ -448,11 +453,10 @@ async function parsePdf(url: string) {
                 points.push(startPoint);
 
             let endPoint: Point = undefined;
-            if (line.height <= 2) { // horizontal line
+            if (line.height <= 2)  // horizontal line
                 endPoint = { x: line.x + line.width, y: line.y };
-            } else { // vertical line
+            else  // vertical line
                 endPoint = { x: line.x, y: line.y + line.height };
-            }
 
             if (!points.some(point => (endPoint.x - point.x) ** 2 + (endPoint.y - point.y) ** 2 < 1))
                 points.push(endPoint);
@@ -463,8 +467,7 @@ async function parsePdf(url: string) {
 
         // Construct cells based on the grid of points.
 
-        let cells: Rectangle[] = [];
-
+        let cells: Cell[] = [];
         for (let point of points) {
             // Find the next closest point in the X direction (moving across horizontally with
             // approximately the same Y co-ordinate).
@@ -483,11 +486,16 @@ async function parsePdf(url: string) {
             // Construct a rectangle from the found points.
 
             if (closestRightPoint !== undefined && closestDownPoint !== undefined) {
-                let cell: Rectangle = { x: point.x, y: point.y, width: closestRightPoint.x - point.x, height: closestDownPoint.y - point.y };
+                let cell: Cell = { elements: [], x: point.x, y: point.y, width: closestRightPoint.x - point.x, height: closestDownPoint.y - point.y };
                 console.log(`            DrawRectangle(e.Graphics, ${cell.x}f, ${cell.y}f, ${cell.width}f, ${cell.height}f);`);
                 cells.push(cell);
             }
         }
+
+        // Sort the cells by approximate Y co-ordinate and then by X co-ordinate.
+
+        let cellComparer = (a, b) => (Math.abs(a.y - b.y) < 2) ? ((a.x > b.x) ? 1 : ((a.x < b.x) ? -1 : 0)) : ((a.y > b.y) ? 1 : -1);
+        cells.sort(cellComparer);
 
         // Find all the text elements.
 
@@ -507,7 +515,7 @@ async function parsePdf(url: string) {
             let height = workaroundHeight;
 console.log(`            DrawText(e.Graphics, "${item.str}", ${x}f, ${y}f, ${width}f, ${height}f);`);
 
-            return { text: item.str, cells: [], x: x, y: y, width: width, height: height };
+            return { text: item.str, x: x, y: y, width: width, height: height };
         });
 
         // Sort the text elements by approximate Y co-ordinate and then by X co-ordinate.
@@ -515,57 +523,42 @@ console.log(`            DrawText(e.Graphics, "${item.str}", ${x}f, ${y}f, ${wid
         let elementComparer = (a, b) => (Math.abs(a.y - b.y) < 1) ? ((a.x > b.x) ? 1 : ((a.x < b.x) ? -1 : 0)) : ((a.y > b.y) ? 1 : -1);
         elements.sort(elementComparer);
 
-        // Find the cell to which each element belongs.  An element may extend across several
+        // Allocate each element to an "owning" cell.  An element may extend across several
         // cells (because the PDF parsing may join together multiple sections of text, using
-        // multiple intervening spaces; see addFakeSpaces in pdf.worker.js of pdf.js).
+        // multiple intervening spaces; see addFakeSpaces in pdf.worker.js of pdf.js).  If
+        // there are multiple cells then allocate the element to the left most cell.
 
         for (let element of elements) {
-            for (let cell of cells) {
-                // Check if the element is entirely within the cell (this is the simple case).
-
-                if (contains(cell, element)) {
-                    element.cells.push(cell);
-                    break;
-                }
-
-                // If the element intersects several cells then add those cells to the element
-                // (the element will then later be parsed and broken up across those cells).
-
-                if (getArea(intersect(cell, element)) > 0)
-                    element.cells.push(cell);
-            }
+            let ownerCell = cells.find(cell => getArea(intersect(cell, element)) > 0);  // this finds the left most cell due to the earlier sorting of cells
+            if (ownerCell !== undefined)
+                ownerCell.elements.push(element);
         }
 
-        // Remove any elements that have no cells (for example the page heading and the page
-        // number in the footer).
+        // Group the cells into rows.
 
-        elements = elements.filter(element => element.cells.length > 0);
+        let rows: Rectangle[][] = [];
 
-        // Find the heading elements.
+        for (let cell of cells) {
+            let row = rows.find(row => Math.abs(row[0].y - cell.y) < 2);  // approximate Y co-ordinate match
+            if (row === undefined)
+                rows.push([ cell ]);  // start a new row
+            else
+                row.push(cell);  // add to an existing row
+        }
 
-        let assessmentElement = elements.find(element => element.text.trim() === "ASSESS" && element.cells.length === 1);
-        let vgNumberElement = elements.find(element => element.text.trim() === "VG NUMBER" && element.cells.length === 1);
-        let applicationNumberElement = elements.find(element => element.text.trim() === "DA NUMBER" && element.cells.length === 1);
-        let applicantElement = elements.find(element => element.text.trim() === "APPLICANT" && element.cells.length === 1);
-        let ownerElement = elements.find(element => element.text.trim() === "OWNER" && element.cells.length === 1);
-        let builderElement = elements.find(element => element.text.trim() === "BUILDER" && element.cells.length === 1);
-        let addressElement = elements.find(element => element.text.trim() === "LOCATION" && element.cells.length === 1);
-        let descriptionElement = elements.find(element => element.text.trim() === "DESCRIPTION" && element.cells.length === 1);
-        let decisionDateElement = elements.find(element => element.text.trim() === "DECISION" && element.cells.length === 1);
-        let valuationElement = elements.find(element => element.text.trim() === "VALUATION" && element.cells.length === 1);
-        let areaElement = elements.find(element => element.text.trim() === "VALUATION" && element.cells.length === 1);
+        // Find the heading cells.
 
-        let assessmentCell = (assessmentElement === undefined) ? undefined : assessmentElement.cells[0];
-        let vgNumberCell = (vgNumberElement === undefined) ? undefined : vgNumberElement.cells[0];
-        let applicationNumberCell = (applicationNumberElement === undefined) ? undefined : applicationNumberElement.cells[0];
-        let applicantCell = (applicantElement === undefined) ? undefined : applicantElement.cells[0];
-        let ownerCell = (ownerElement === undefined) ? undefined : ownerElement.cells[0];
-        let builderCell = (builderElement === undefined) ? undefined : builderElement.cells[0];
-        let addressCell = (addressElement === undefined) ? undefined : addressElement.cells[0];
-        let descriptionCell = (descriptionElement === undefined) ? undefined : descriptionElement.cells[0];
-        let decisionDateCell = (decisionDateElement === undefined) ? undefined : decisionDateElement.cells[0];
-        let valuationCell = (valuationElement === undefined) ? undefined : valuationElement.cells[0];
-        let areaCell = (areaElement === undefined) ? undefined : areaElement.cells[0];
+        let assessmentCell = cells.find(cell => cell.elements.some(element => element.text.trim() === "ASSESS" && contains(cell, element)));
+        let vgNumberCell = cells.find(cell => cell.elements.some(element => element.text.trim() === "VG NUMBER" && contains(cell, element)));
+        let applicationNumberCell = cells.find(cell => cell.elements.some(element => element.text.trim() === "DA NUMBER" && contains(cell, element)));
+        let applicantCell = cells.find(cell => cell.elements.some(element => element.text.trim() === "APPLICANT" && contains(cell, element)));
+        let ownerCell = cells.find(cell => cell.elements.some(element => element.text.trim() === "OWNER" && contains(cell, element)));
+        let builderCell = cells.find(cell => cell.elements.some(element => element.text.trim() === "BUILDER" && contains(cell, element)));
+        let addressCell = cells.find(cell => cell.elements.some(element => element.text.trim() === "LOCATION" && contains(cell, element)));
+        let descriptionCell = cells.find(cell => cell.elements.some(element => element.text.trim() === "DESCRIPTION" && contains(cell, element)));
+        let decisionDateCell = cells.find(cell => cell.elements.some(element => element.text.trim() === "DECISION" && contains(cell, element)));
+        let valuationCell = cells.find(cell => cell.elements.some(element => element.text.trim() === "VALUATION" && contains(cell, element)));
+        let areaCell = cells.find(cell => cell.elements.some(element => element.text.trim() === "AREA" && contains(cell, element)));
 
         if (applicationNumberCell === undefined) {
             let elementSummary = elements.map(element => `[${element.text}]`).join("");
@@ -581,41 +574,37 @@ console.log(`            DrawText(e.Graphics, "${item.str}", ${x}f, ${y}f, ${wid
 
         // Parse any elements that intersect more than one cell.
 
-        for (let element of elements) {
-            if (element.cells !== undefined && element.cells.length >= 2) {
+        for (let cell of cells) {
+            if (cell.elements.some(element => !contains(cell, element))) {
                 // Examine each cell that the element intersects.  In most cases determining which
                 // column heading the first cell falls under will enable the text to be split and
                 // so then allocated to appropriate columns.
 
-                let firstCell = element.cells[0];
-                if (getHorizontalOverlapPercentage(firstCell, assessmentCell) > 90) {
-
-                } else if (getHorizontalOverlapPercentage(firstCell, vgNumberCell) > 90) {
-
-                } else if (getHorizontalOverlapPercentage(firstCell, applicationNumberCell) > 90) {
-
-                } else if (getHorizontalOverlapPercentage(firstCell, applicantCell) > 90) {
-
-                } else if (getHorizontalOverlapPercentage(firstCell, ownerCell) > 90) {
-
-                } else if (getHorizontalOverlapPercentage(firstCell, builderCell) > 90) {
+                // let firstCell = element.cells[0];
+                if (getHorizontalOverlapPercentage(cell, assessmentCell) > 90) {
                     
-                } else if (getHorizontalOverlapPercentage(firstCell, addressCell) > 90) {
+                } else if (getHorizontalOverlapPercentage(cell, vgNumberCell) > 90) {
+
+                } else if (getHorizontalOverlapPercentage(cell, applicationNumberCell) > 90) {
+
+                } else if (getHorizontalOverlapPercentage(cell, applicantCell) > 90) {
+
+                } else if (getHorizontalOverlapPercentage(cell, ownerCell) > 90) {
+
+                } else if (getHorizontalOverlapPercentage(cell, builderCell) > 90) {
                     
-                } else if (getHorizontalOverlapPercentage(firstCell, descriptionCell) > 90) {
+                } else if (getHorizontalOverlapPercentage(cell, addressCell) > 90) {
                     
-                } else if (getHorizontalOverlapPercentage(firstCell, decisionDateCell) > 90) {
+                } else if (getHorizontalOverlapPercentage(cell, descriptionCell) > 90) {
                     
-                } else if (getHorizontalOverlapPercentage(firstCell, valuationCell) > 90) {
+                } else if (getHorizontalOverlapPercentage(cell, decisionDateCell) > 90) {
                     
-                } else if (getHorizontalOverlapPercentage(firstCell, areaCell) > 90) {
+                } else if (getHorizontalOverlapPercentage(cell, valuationCell) > 90) {
+                    
+                } else if (getHorizontalOverlapPercentage(cell, areaCell) > 90) {
                     
                 } else {
                     
-                }
-
-                for (let cell of element.cells) {
-
                 }
             }
         }
@@ -672,7 +661,6 @@ console.log(`            DrawText(e.Graphics, "${item.str}", ${x}f, ${y}f, ${wid
             let startElement = startElements[index];
             let raisedStartElement: Element = {
                 text: startElement.text,
-                cells: [],
                 x: startElement.x,
                 y: startElement.y - startElement.height / 2,  // leeway
                 width: startElement.width,
