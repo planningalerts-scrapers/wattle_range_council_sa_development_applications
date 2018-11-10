@@ -546,9 +546,9 @@ console.log(`            DrawText(e.Graphics, "${item.str}", ${x}f, ${y}f, ${wid
                 row.push(cell);  // add to an existing row
         }
 
-        // Ensure the rows are sorted by Y co-ordinate and that  the cells in each row are sorted
-        // by X co-ordinate (this is just a safety precaution because the earlier sorting of cells
-        // should have already ensured this).
+        // Ensure the rows are sorted by Y co-ordinate and that the cells in each row are sorted
+        // by X co-ordinate (this is really just a safety precaution because the earlier sorting
+        // of cells should have already ensured this).
 
         let rowComparer = (a, b) => (a.y > b.y) ? 1 : ((a.y < b.y) ? -1 : 0);
         rows.sort(rowComparer);
@@ -586,16 +586,29 @@ console.log(`            DrawText(e.Graphics, "${item.str}", ${x}f, ${y}f, ${wid
         // Parse any elements that intersect more than one cell.
 
         for (let cell of cells) {
-            for (let element of cell.elements) {  // <-- wrong, could process same element twice
-                if (!contains(cell, element)) {  // if element extends outside of the owning cell (perhaps into another cell, perhaps outside of any cell)
+            let updatedElements: Element[] = [];            
+
+
+            for (let element of cell.elements) {
+                if (contains(cell, element))  // if the element is completely inside the owning cell
+                    updatedElements.push(element);
+                else {  // if the element extends outside of the owning cell (perhaps into another cell, perhaps outside of any cell)
                     // Get all elements that have approximately the same Y co-ordinate in the cell.
 
                     let ambiguousElements = cell.elements.filter(otherElement => Math.abs(otherElement.y - element.y) < 5);
                     let text = ambiguousElements.map(element => element.text).join("");
 
-                    // Parse the text.
-
-                    console.log(text);
+                    if (getHorizontalOverlapPercentage(cell, assessmentCell) > 90) {
+                        let tokens = text.split("   ").map(token => token.trim()).filter(token => token !== "");
+                        let [ assessmentText, vgNumberText, applicationNumberText] = tokens;
+                        console.log(`1=${assessmentText}    2=${vgNumberText}    3=${applicationNumberText}`);
+                    } else if (getHorizontalOverlapPercentage(cell, descriptionCell) > 90) {
+                        let tokens = text.split("   ").map(token => token.trim()).filter(token => token !== "");
+                        let [ descriptionText ] = tokens;
+                        console.log(`1=${descriptionText}`);
+                    } else {
+                        console.log(`IGNORED: ${text}`);
+                    }
                 }
             }
 
