@@ -536,7 +536,7 @@ console.log(`            DrawText(e.Graphics, "${item.str}", ${x}f, ${y}f, ${wid
 
         // Group the cells into rows.
 
-        let rows: Rectangle[][] = [];
+        let rows: Cell[][] = [];
 
         for (let cell of cells) {
             let row = rows.find(row => Math.abs(row[0].y - cell.y) < 2);  // approximate Y co-ordinate match
@@ -585,81 +585,127 @@ console.log(`            DrawText(e.Graphics, "${item.str}", ${x}f, ${y}f, ${wid
 
         // Parse any elements that intersect more than one cell.
 
-        for (let cell of cells) {
-            let updatedElements: Element[] = [];            
+        for (let row of rows) {
+            for (let columnIndex = 0; columnIndex < row.length; columnIndex++) {
+                let cell = row[columnIndex];
 
+                let overhangElements = cell.elements.filter(element => !contains(cell, element));
+                for (let overhangElement of overhangElements) {
+                    // Find the companions (ie. roughly aligned with the same Y co-ordinate) of an
+                    // element that intersects more than once cell.
 
-            for (let element of cell.elements) {
-                if (contains(cell, element))  // if the element is completely inside the owning cell
-                    updatedElements.push(element);
-                else {  // if the element extends outside of the owning cell (perhaps into another cell, perhaps outside of any cell)
-                    // Get all elements that have approximately the same Y co-ordinate in the cell.
+                    let alignedElements: Element[] = [];
+                    for (let index = cell.elements.length - 1; index >= 0; index--) {
+                        if (Math.abs(cell.elements[index].y - overhangElement.y) < 5) {  // elements with approximately the same Y co-ordinate
+                            alignedElements.unshift(cell.elements[index]);
+                            cell.elements.splice(index, 1);  // remove the element
+                        }
+                    }
 
-                    let ambiguousElements = cell.elements.filter(otherElement => Math.abs(otherElement.y - element.y) < 5);
-                    let text = ambiguousElements.map(element => element.text).join("");
+                    // Join the aligned elements together and parse the resulting text.  Construct
+                    // elements for the resulting text and add those elements to appropriate cells
+                    // (these new elements effectively replace the old, removed elements).
+
+                    let text = alignedElements.map(element => element.text).join("").trim();
+                    if (text === "")
+                        continue;
 
                     if (getHorizontalOverlapPercentage(cell, assessmentCell) > 90) {
                         let tokens = text.split("   ").map(token => token.trim()).filter(token => token !== "");
                         let [ assessmentText, vgNumberText, applicationNumberText] = tokens;
-                        console.log(`1=${assessmentText}    2=${vgNumberText}    3=${applicationNumberText}`);
+                        cell.elements.push({ text: assessmentText, x: alignedElements[0].x, y: alignedElements[0].y, width: (cell.x + cell.width - alignedElements[0].x), height: alignedElements[0].height });
+                        if (columnIndex + 1 < row.length && vgNumberText !== undefined) {
+                            let vgNumberCell = row[columnIndex + 1];
+                            vgNumberCell.elements.push({ text: vgNumberText, x: vgNumberCell.x, y: alignedElements[0].y, width: vgNumberCell.width, height: alignedElements[0].height });
+                        }
+                        if (columnIndex + 2 < row.length && applicationNumberText !== undefined) {
+                            let applicationNumberCell = row[columnIndex + 2];
+                            applicationNumberCell.elements.push({ text: applicationNumberText, x: applicationNumberCell.x, y: alignedElements[0].y, width: applicationNumberCell.width, height: alignedElements[0].height });
+                        }
                     } else if (getHorizontalOverlapPercentage(cell, descriptionCell) > 90) {
                         let tokens = text.split("   ").map(token => token.trim()).filter(token => token !== "");
                         let [ descriptionText ] = tokens;
-                        console.log(`1=${descriptionText}`);
-                    } else {
-                        console.log(`IGNORED: ${text}`);
+                        cell.elements.push({ text: descriptionText, x: alignedElements[0].x, y: alignedElements[0].y, width: (cell.x + cell.width - alignedElements[0].x), height: alignedElements[0].height });
                     }
                 }
             }
 
-            if (cell.elements.some(element => !contains(cell, element))) {
-                // Examine each cell that the element intersects.  In most cases determining which
-                // column heading the first cell falls under will enable the text to be split and
-                // so then allocated to appropriate columns.
+            // let updatedElements: Element[] = [];            
+            //
+            // for (let element of cell.elements) {
+            //     if (contains(cell, element))  // if the element is completely inside the owning cell
+            //         updatedElements.push(element);
+            //     else {  // if the element extends outside of the owning cell (perhaps into another cell, perhaps outside of any cell)
+            //         // Get all elements that have approximately the same Y co-ordinate in the cell.
+            //
+            //         let ambiguousElements = cell.elements.filter(otherElement => Math.abs(otherElement.y - element.y) < 5);
+            //         let text = ambiguousElements.map(element => element.text).join("");
+            //
+            //         if (getHorizontalOverlapPercentage(cell, assessmentCell) > 90) {
+            //             let tokens = text.split("   ").map(token => token.trim()).filter(token => token !== "");
+            //             let [ assessmentText, vgNumberText, applicationNumberText] = tokens;
+            //             console.log(`1=${assessmentText}    2=${vgNumberText}    3=${applicationNumberText}`);
+            //         } else if (getHorizontalOverlapPercentage(cell, descriptionCell) > 90) {
+            //             let tokens = text.split("   ").map(token => token.trim()).filter(token => token !== "");
+            //             let [ descriptionText ] = tokens;
+            //             console.log(`1=${descriptionText}`);
+            //         } else {
+            //             console.log(`IGNORED: ${text}`);
+            //         }
+            //     }
+            // }
 
-                // let firstCell = element.cells[0];
-                if (getHorizontalOverlapPercentage(cell, assessmentCell) > 90) {
-                    
-                } else if (getHorizontalOverlapPercentage(cell, vgNumberCell) > 90) {
-
-                } else if (getHorizontalOverlapPercentage(cell, applicationNumberCell) > 90) {
-
-                } else if (getHorizontalOverlapPercentage(cell, applicantCell) > 90) {
-
-                } else if (getHorizontalOverlapPercentage(cell, ownerCell) > 90) {
-
-                } else if (getHorizontalOverlapPercentage(cell, builderCell) > 90) {
-                    
-                } else if (getHorizontalOverlapPercentage(cell, addressCell) > 90) {
-                    
-                } else if (getHorizontalOverlapPercentage(cell, descriptionCell) > 90) {
-                    
-                } else if (getHorizontalOverlapPercentage(cell, decisionDateCell) > 90) {
-                    
-                } else if (getHorizontalOverlapPercentage(cell, valuationCell) > 90) {
-                    
-                } else if (getHorizontalOverlapPercentage(cell, areaCell) > 90) {
-                    
-                } else {
-                    
-                }
-            }
+            // if (cell.elements.some(element => !contains(cell, element))) {
+            //     // Examine each cell that the element intersects.  In most cases determining which
+            //     // column heading the first cell falls under will enable the text to be split and
+            //     // so then allocated to appropriate columns.
+            //
+            //     // let firstCell = element.cells[0];
+            //     if (getHorizontalOverlapPercentage(cell, assessmentCell) > 90) {
+            //
+            //     } else if (getHorizontalOverlapPercentage(cell, vgNumberCell) > 90) {
+            //
+            //     } else if (getHorizontalOverlapPercentage(cell, applicationNumberCell) > 90) {
+            //
+            //     } else if (getHorizontalOverlapPercentage(cell, applicantCell) > 90) {
+            //
+            //     } else if (getHorizontalOverlapPercentage(cell, ownerCell) > 90) {
+            //
+            //     } else if (getHorizontalOverlapPercentage(cell, builderCell) > 90) {
+            //
+            //     } else if (getHorizontalOverlapPercentage(cell, addressCell) > 90) {
+            //
+            //     } else if (getHorizontalOverlapPercentage(cell, descriptionCell) > 90) {
+            //
+            //     } else if (getHorizontalOverlapPercentage(cell, decisionDateCell) > 90) {
+            //
+            //     } else if (getHorizontalOverlapPercentage(cell, valuationCell) > 90) {
+            //
+            //     } else if (getHorizontalOverlapPercentage(cell, areaCell) > 90) {
+            //
+            //     } else {
+            //
+            //     }
+            // }
         }
 
-        // Group the elements into rows.
+        // Re-sort the elements in each cell (now that elements have been constructed and added).
 
+        for (let row of rows)
+            for (let cell of row)
+                cell.elements.sort(elementComparer);
 
         // Sort the elements by Y co-ordinate and then by X co-ordinate.
         //
         // let elementComparer = (a, b) => (a.y > b.y) ? 1 : ((a.y < b.y) ? -1 : ((a.x > b.x) ? 1 : ((a.x < b.x) ? -1 : 0)));
         // elements.sort(elementComparer);
-
+        //
         // Ignore the page number (the last element on the page).  Otherwise this will end up as
         // part of a description.
         //
         // if (/[0-9]+/.test(elements[elements.length - 1].text) && Number(elements[elements.length - 1].text) < 1000)
         //     elements.pop();
-
+        //
         // Find the main column heading elements.
         //
         // let applicationElement = elements.find(element => element.text.trim() === "DA NUMBER");
@@ -670,7 +716,7 @@ console.log(`            DrawText(e.Graphics, "${item.str}", ${x}f, ${y}f, ${wid
         // let decisionElement = elements.find(element => element.text.trim() === "DECISION");
         // let proposalElement = undefined;
         // let referralsElement = undefined;
-        
+        //
         // if (applicantElement === undefined) {
         //     let elementSummary = elements.map(element => `[${element.text}]`).join("");
         //     console.log(`No development applications can be parsed from the current page because the \"Applicant\" column heading was not found.  Elements: ${elementSummary}`);
