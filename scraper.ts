@@ -513,7 +513,7 @@ async function parsePdf(url: string) {
             let y = transform[5] - workaroundHeight;
             let width = item.width;
             let height = workaroundHeight;
-console.log(`            DrawText(e.Graphics, "${item.str}", ${x}f, ${y}f, ${width}f, ${height}f);`);
+// console.log(`            DrawText(e.Graphics, "${item.str}", ${x}f, ${y}f, ${width}f, ${height}f);`);
 
             return { text: item.str, x: x, y: y, width: width, height: height };
         });
@@ -624,8 +624,16 @@ console.log(`            DrawText(e.Graphics, "${item.str}", ${x}f, ${y}f, ${wid
                         }
                     } else if (getHorizontalOverlapPercentage(cell, descriptionCell) > 90) {
                         let tokens = text.split("   ").map(token => token.trim()).filter(token => token !== "");
-                        let [ descriptionText ] = tokens;
+                        let [ descriptionText, decisionDateText ] = tokens;
                         cell.elements.push({ text: descriptionText, x: alignedElements[0].x, y: alignedElements[0].y, width: (cell.x + cell.width - alignedElements[0].x), height: alignedElements[0].height });
+                        if (columnIndex + 1 < row.length && decisionDateText !== undefined) {
+                            let decisionDateCell = row[columnIndex + 1];
+                            decisionDateCell.elements.push({ text: decisionDateText, x: decisionDateCell.x, y: alignedElements[0].y, width: decisionDateCell.width, height: alignedElements[0].height });
+                        }
+                    } else if (getHorizontalOverlapPercentage(cell, decisionDateCell) > 90) {
+                        let tokens = text.split("   ").map(token => token.trim()).filter(token => token !== "");
+                        let [ decisionDateText ] = tokens;
+                        cell.elements.push({ text: decisionDateText, x: alignedElements[0].x, y: alignedElements[0].y, width: (cell.x + cell.width - alignedElements[0].x), height: alignedElements[0].height });
                     }
                 }
             }
@@ -694,6 +702,12 @@ console.log(`            DrawText(e.Graphics, "${item.str}", ${x}f, ${y}f, ${wid
         for (let row of rows)
             for (let cell of row)
                 cell.elements.sort(elementComparer);
+
+            
+        for (let row of rows)
+            for (let cell of row)
+                for (let element of cell.elements)
+                    console.log(`            DrawText(e.Graphics, "${element.text}", ${element.x}f, ${element.y}f, ${element.width}f, ${element.height}f);`);
 
         // Sort the elements by Y co-ordinate and then by X co-ordinate.
         //
