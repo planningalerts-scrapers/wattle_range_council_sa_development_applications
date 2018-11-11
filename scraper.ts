@@ -427,14 +427,13 @@ async function parsePdf(url: string) {
         for (let index = 0; index < operators.fnArray.length; index++) {
             if (operators.fnArray[index] !== pdfjs.OPS.constructPath)
                 continue;
+                
             let x = operators.argsArray[index][1][1];
             let y = operators.argsArray[index][1][0];
             let width = operators.argsArray[index][1][3];
             let height = operators.argsArray[index][1][2];
 
             lines.push({x: x, y: y, width: width, height: height});
-
-            // console.log(`            Draw(e.Graphics, ${x}f, ${y}f, ${width}f, ${height}f);`);
         }
 
         // Convert the lines into a grid of points.
@@ -462,9 +461,6 @@ async function parsePdf(url: string) {
                 points.push(endPoint);
         }
 
-        for (let point of points)
-            console.log(`            DrawPoint(e.Graphics, ${point.x}f, ${point.y}f);`);
-
         // Construct cells based on the grid of points.
 
         let cells: Cell[] = [];
@@ -485,11 +481,8 @@ async function parsePdf(url: string) {
 
             // Construct a rectangle from the found points.
 
-            if (closestRightPoint !== undefined && closestDownPoint !== undefined) {
-                let cell: Cell = { elements: [], x: point.x, y: point.y, width: closestRightPoint.x - point.x, height: closestDownPoint.y - point.y };
-                console.log(`            DrawRectangle(e.Graphics, ${cell.x}f, ${cell.y}f, ${cell.width}f, ${cell.height}f);`);
-                cells.push(cell);
-            }
+            if (closestRightPoint !== undefined && closestDownPoint !== undefined)
+                cells.push({ elements: [], x: point.x, y: point.y, width: closestRightPoint.x - point.x, height: closestDownPoint.y - point.y });
         }
 
         // Sort the cells by approximate Y co-ordinate and then by X co-ordinate.
@@ -513,7 +506,6 @@ async function parsePdf(url: string) {
             let y = transform[5] - workaroundHeight;
             let width = item.width;
             let height = workaroundHeight;
-// console.log(`            DrawText(e.Graphics, "${item.str}", ${x}f, ${y}f, ${width}f, ${height}f);`);
 
             return { text: item.str, x: x, y: y, width: width, height: height };
         });
@@ -560,16 +552,10 @@ async function parsePdf(url: string) {
         // Find the heading cells.
 
         let assessmentCell = cells.find(cell => cell.elements.some(element => element.text.trim() === "ASSESS" && contains(cell, element)));
-        let vgNumberCell = cells.find(cell => cell.elements.some(element => element.text.trim() === "VG NUMBER" && contains(cell, element)));
         let applicationNumberCell = cells.find(cell => cell.elements.some(element => element.text.trim() === "DA NUMBER" && contains(cell, element)));
-        let applicantCell = cells.find(cell => cell.elements.some(element => element.text.trim() === "APPLICANT" && contains(cell, element)));
-        let ownerCell = cells.find(cell => cell.elements.some(element => element.text.trim() === "OWNER" && contains(cell, element)));
-        let builderCell = cells.find(cell => cell.elements.some(element => element.text.trim() === "BUILDER" && contains(cell, element)));
         let addressCell = cells.find(cell => cell.elements.some(element => element.text.trim() === "LOCATION" && contains(cell, element)));
         let descriptionCell = cells.find(cell => cell.elements.some(element => element.text.trim() === "DESCRIPTION" && contains(cell, element)));
         let decisionDateCell = cells.find(cell => cell.elements.some(element => element.text.trim() === "DECISION" && contains(cell, element)));
-        let valuationCell = cells.find(cell => cell.elements.some(element => element.text.trim() === "VALUATION" && contains(cell, element)));
-        let areaCell = cells.find(cell => cell.elements.some(element => element.text.trim() === "AREA" && contains(cell, element)));
 
         if (applicationNumberCell === undefined) {
             let elementSummary = elements.map(element => `[${element.text}]`).join("");
@@ -583,7 +569,8 @@ async function parsePdf(url: string) {
             continue;
         }
 
-        // Parse any elements that intersect more than one cell.
+        // Parse any elements that intersect more than one cell (and split them into multiple
+        // elements).
 
         for (let row of rows) {
             for (let columnIndex = 0; columnIndex < row.length; columnIndex++) {
@@ -592,7 +579,7 @@ async function parsePdf(url: string) {
                 let overhangElements = cell.elements.filter(element => !contains(cell, element));
                 for (let overhangElement of overhangElements) {
                     // Find the companions (ie. roughly aligned with the same Y co-ordinate) of an
-                    // element that intersects more than once cell.
+                    // element that intersects more than one cell.
 
                     let alignedElements: Element[] = [];
                     for (let index = cell.elements.length - 1; index >= 0; index--) {
@@ -637,113 +624,14 @@ async function parsePdf(url: string) {
                     }
                 }
             }
-
-            // let updatedElements: Element[] = [];            
-            //
-            // for (let element of cell.elements) {
-            //     if (contains(cell, element))  // if the element is completely inside the owning cell
-            //         updatedElements.push(element);
-            //     else {  // if the element extends outside of the owning cell (perhaps into another cell, perhaps outside of any cell)
-            //         // Get all elements that have approximately the same Y co-ordinate in the cell.
-            //
-            //         let ambiguousElements = cell.elements.filter(otherElement => Math.abs(otherElement.y - element.y) < 5);
-            //         let text = ambiguousElements.map(element => element.text).join("");
-            //
-            //         if (getHorizontalOverlapPercentage(cell, assessmentCell) > 90) {
-            //             let tokens = text.split("   ").map(token => token.trim()).filter(token => token !== "");
-            //             let [ assessmentText, vgNumberText, applicationNumberText] = tokens;
-            //             console.log(`1=${assessmentText}    2=${vgNumberText}    3=${applicationNumberText}`);
-            //         } else if (getHorizontalOverlapPercentage(cell, descriptionCell) > 90) {
-            //             let tokens = text.split("   ").map(token => token.trim()).filter(token => token !== "");
-            //             let [ descriptionText ] = tokens;
-            //             console.log(`1=${descriptionText}`);
-            //         } else {
-            //             console.log(`IGNORED: ${text}`);
-            //         }
-            //     }
-            // }
-
-            // if (cell.elements.some(element => !contains(cell, element))) {
-            //     // Examine each cell that the element intersects.  In most cases determining which
-            //     // column heading the first cell falls under will enable the text to be split and
-            //     // so then allocated to appropriate columns.
-            //
-            //     // let firstCell = element.cells[0];
-            //     if (getHorizontalOverlapPercentage(cell, assessmentCell) > 90) {
-            //
-            //     } else if (getHorizontalOverlapPercentage(cell, vgNumberCell) > 90) {
-            //
-            //     } else if (getHorizontalOverlapPercentage(cell, applicationNumberCell) > 90) {
-            //
-            //     } else if (getHorizontalOverlapPercentage(cell, applicantCell) > 90) {
-            //
-            //     } else if (getHorizontalOverlapPercentage(cell, ownerCell) > 90) {
-            //
-            //     } else if (getHorizontalOverlapPercentage(cell, builderCell) > 90) {
-            //
-            //     } else if (getHorizontalOverlapPercentage(cell, addressCell) > 90) {
-            //
-            //     } else if (getHorizontalOverlapPercentage(cell, descriptionCell) > 90) {
-            //
-            //     } else if (getHorizontalOverlapPercentage(cell, decisionDateCell) > 90) {
-            //
-            //     } else if (getHorizontalOverlapPercentage(cell, valuationCell) > 90) {
-            //
-            //     } else if (getHorizontalOverlapPercentage(cell, areaCell) > 90) {
-            //
-            //     } else {
-            //
-            //     }
-            // }
         }
 
-        // Re-sort the elements in each cell (now that elements have been constructed and added).
+        // Re-sort the elements in each cell (now that elements have been re-constructed and then
+        // added to different cells).
 
         for (let row of rows)
             for (let cell of row)
                 cell.elements.sort(elementComparer);
-
-            
-        for (let row of rows)
-            for (let cell of row)
-                for (let element of cell.elements)
-                    console.log(`            DrawText(e.Graphics, "${element.text}", ${element.x}f, ${element.y}f, ${element.width}f, ${element.height}f);`);
-
-        // Sort the elements by Y co-ordinate and then by X co-ordinate.
-        //
-        // let elementComparer = (a, b) => (a.y > b.y) ? 1 : ((a.y < b.y) ? -1 : ((a.x > b.x) ? 1 : ((a.x < b.x) ? -1 : 0)));
-        // elements.sort(elementComparer);
-        //
-        // Ignore the page number (the last element on the page).  Otherwise this will end up as
-        // part of a description.
-        //
-        // if (/[0-9]+/.test(elements[elements.length - 1].text) && Number(elements[elements.length - 1].text) < 1000)
-        //     elements.pop();
-        //
-        // Find the main column heading elements.
-        //
-        // let applicationElement = elements.find(element => element.text.trim() === "DA NUMBER");
-        // let applicantElement = elements.find(element => element.text.trim() === "APPLICANT");
-        // let ownerElement = elements.find(element => element.text.trim() === "OWNER");
-        // let locationElement = elements.find(element => element.text.trim() === "LOCATION");
-        // let descriptionElement = elements.find(element => element.text.trim() === "DESCRIPTION");
-        // let decisionElement = elements.find(element => element.text.trim() === "DECISION");
-        // let proposalElement = undefined;
-        // let referralsElement = undefined;
-        //
-        // if (applicantElement === undefined) {
-        //     let elementSummary = elements.map(element => `[${element.text}]`).join("");
-        //     console.log(`No development applications can be parsed from the current page because the \"Applicant\" column heading was not found.  Elements: ${elementSummary}`);
-        //     continue;
-        // } else if (applicationElement === undefined) {
-        //     let elementSummary = elements.map(element => `[${element.text}]`).join("");
-        //     console.log(`No development applications can be parsed from the current page because the \"Application Date\" column heading was not found.  Elements: ${elementSummary}`);
-        //     continue;
-        // } else if (proposalElement === undefined) {
-        //     let elementSummary = elements.map(element => `[${element.text}]`).join("");
-        //     console.log(`No development applications can be parsed from the current page because the \"Proposal\" column heading was not found.  Elements: ${elementSummary}`);
-        //     continue;
-        // }
 
         // Group the elements into sections based on where the "Lodgement" text starts (and other
         // elements the "Lodgement" elements line up with horizontally with a margin of error equal
