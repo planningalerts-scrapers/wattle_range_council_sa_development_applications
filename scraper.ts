@@ -538,11 +538,19 @@ async function parsePdf(url: string) {
                 row.push(cell);  // add to an existing row
         }
 
+        // Check that there is at least one row (even if it is just the heading row).
+
+        if (rows.length === 0) {
+            let elementSummary = elements.map(element => `[${element.text}]`).join("");
+            console.log(`No development applications can be parsed from the current page because no rows were found (based on the grid).  Elements: ${elementSummary}`);
+            continue;
+        }
+
         // Ensure the rows are sorted by Y co-ordinate and that the cells in each row are sorted
         // by X co-ordinate (this is really just a safety precaution because the earlier sorting
         // of cells should have already ensured this).
 
-        let rowComparer = (a, b) => (a.y > b.y) ? 1 : ((a.y < b.y) ? -1 : 0);
+        let rowComparer = (a, b) => (a[0].y > b[0].y) ? 1 : ((a[0].y < b[0].y) ? -1 : 0);
         rows.sort(rowComparer);
 
         let rowCellComparer = (a, b) => (a.x > b.x) ? 1 : ((a.x < b.x) ? -1 : 0);
@@ -598,6 +606,9 @@ async function parsePdf(url: string) {
                         continue;
 
                     if (getHorizontalOverlapPercentage(cell, assessmentCell) > 90) {
+                        // Parse the text into an assessment, a VG number and an application
+                        // number.
+
                         let tokens = text.split("   ").map(token => token.trim()).filter(token => token !== "");
                         let [ assessmentText, vgNumberText, applicationNumberText] = tokens;
                         cell.elements.push({ text: assessmentText, x: alignedElements[0].x, y: alignedElements[0].y, width: (cell.x + cell.width - alignedElements[0].x), height: alignedElements[0].height });
@@ -610,6 +621,8 @@ async function parsePdf(url: string) {
                             applicationNumberCell.elements.push({ text: applicationNumberText, x: applicationNumberCell.x, y: alignedElements[0].y, width: applicationNumberCell.width, height: alignedElements[0].height });
                         }
                     } else if (getHorizontalOverlapPercentage(cell, descriptionCell) > 90) {
+                        // Parse the text into a description and a decision date.
+
                         let tokens = text.split("   ").map(token => token.trim()).filter(token => token !== "");
                         let [ descriptionText, decisionDateText ] = tokens;
                         cell.elements.push({ text: descriptionText, x: alignedElements[0].x, y: alignedElements[0].y, width: (cell.x + cell.width - alignedElements[0].x), height: alignedElements[0].height });
@@ -618,6 +631,8 @@ async function parsePdf(url: string) {
                             decisionDateCell.elements.push({ text: decisionDateText, x: decisionDateCell.x, y: alignedElements[0].y, width: decisionDateCell.width, height: alignedElements[0].height });
                         }
                     } else if (getHorizontalOverlapPercentage(cell, decisionDateCell) > 90) {
+                        // Parse the text into a decision date.
+
                         let tokens = text.split("   ").map(token => token.trim()).filter(token => token !== "");
                         let [ decisionDateText ] = tokens;
                         cell.elements.push({ text: decisionDateText, x: alignedElements[0].x, y: alignedElements[0].y, width: (cell.x + cell.width - alignedElements[0].x), height: alignedElements[0].height });
@@ -633,51 +648,22 @@ async function parsePdf(url: string) {
             for (let cell of row)
                 cell.elements.sort(elementComparer);
 
-        // Group the elements into sections based on where the "Lodgement" text starts (and other
-        // elements the "Lodgement" elements line up with horizontally with a margin of error equal
-        // to about half the height of the "Lodgement" text).
+        // Try to extract a development application from each row (some rows, such as the heading
+        // row, will not actually contain a development application).
 
-        let applicationElementGroups = [];
-        let startElements = findStartElements(elements);
-        for (let index = 0; index < startElements.length; index++) {
-            // Determine the highest Y co-ordinate of this row and the next row (or the bottom of
-            // the current page).  Allow some leeway vertically (add some extra height).
-            
-            let startElement = startElements[index];
-            let raisedStartElement: Element = {
-                text: startElement.text,
-                x: startElement.x,
-                y: startElement.y - startElement.height / 2,  // leeway
-                width: startElement.width,
-                height: startElement.height };
-            let rowTop = getRowTop(elements, raisedStartElement);
-            let nextRowTop = (index + 1 < startElements.length) ? getRowTop(elements, startElements[index + 1]) : Number.MAX_VALUE;
+        for (let row of rows) {
+            let rowApplicationNumberCell = row.find(cell => getHorizontalOverlapPercentage(cell, applicationNumberCell) > 90);
+            let rowAddressCell = row.find(cell => getHorizontalOverlapPercentage(cell, addressCell) > 90);
+            let rowDescriptionCell = row.find(cell => getHorizontalOverlapPercentage(cell, descriptionCell) > 90);
+            let rowDecisionDateCell = row.find(cell => getHorizontalOverlapPercentage(cell, decisionDateCell) > 90);
 
-            // Extract all elements between the two rows.
+            let applicationNumber = rowApplicationNumberCell.elements.map(element => element.text).join("").trim();
+            let address = rowAddressCell.elements.map(element => element.text).join("").trim();
+            let description = (rowDescriptionCell === undefined) ? "" : rowDescriptionCell.elements.map(element => element.text).join("").trim();
+            let decisionDate = (rowDecisionDateCell === undefined) ? "" : rowDecisionDateCell.elements.map(element => element.text).join("").trim();
 
-            applicationElementGroups.push({ startElement: startElements[index], elements: elements.filter(element => element.y >= rowTop && element.y + element.height < nextRowTop) });
+            console.log(`applicationNumber=[${applicationNumber}] address=[${address}] description=[${description}] decisionDate=[${decisionDate}]`);
         }
-
-        // Parse the development application from each group of elements (ie. a section of the
-        // current page of the PDF document).  If the same application number is encountered a
-        // second time add a suffix to the application number so it is unique (and so will be
-        // inserted into the database later instead of being ignored).
-        //
-        // for (let applicationElementGroup of applicationElementGroups) {
-        //     let developmentApplication = parseApplicationElements(applicationElementGroup.elements, applicationElementGroup.startElement, applicantElement, applicationElement, proposalElement, referralsElement, url);
-        //     if (developmentApplication !== undefined) {
-        //         let suffix = 0;
-        //         let applicationNumber = developmentApplication.applicationNumber;
-        //         while (developmentApplications
-        //             .some(otherDevelopmentApplication =>
-        //                 otherDevelopmentApplication.applicationNumber === developmentApplication.applicationNumber &&
-        //                     (otherDevelopmentApplication.address !== developmentApplication.address ||
-        //                     otherDevelopmentApplication.description !== developmentApplication.description ||
-        //                     otherDevelopmentApplication.receivedDate !== developmentApplication.receivedDate)))
-        //             developmentApplication.applicationNumber = `${applicationNumber} (${++suffix})`;  // add a unique suffix
-        //         developmentApplications.push(developmentApplication);
-        //     }
-        // }
     }
 
     return developmentApplications;
