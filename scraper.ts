@@ -660,8 +660,20 @@ async function parsePdf(url: string) {
             let applicationNumber = rowApplicationNumberCell.elements.map(element => element.text).join("").trim();
             let address = rowAddressCell.elements.map(element => element.text).join("").trim();
             let description = (rowDescriptionCell === undefined) ? "" : rowDescriptionCell.elements.map(element => element.text).join("").trim();
-            let decisionDate = (rowDecisionDateCell === undefined) ? "" : rowDecisionDateCell.elements.map(element => element.text).join("").trim();
+            let decisionDateText = (rowDecisionDateCell === undefined) ? "" : rowDecisionDateCell.elements.map(element => element.text).join("").trim();
 
+            if (!/[0-9]+\/[0-9]+\/[0-9]/.test(applicationNumber))
+                continue;
+
+            address = formatAddress(address);
+            if (address === "")
+                continue;
+
+            if (description === "")
+                description = "NO DESCRIPTION PROVIDED";
+            
+            let decisionDate = moment(decisionDateText.replace(/\./g, "/"), "D/MM/YYYY", true);
+                
             console.log(`applicationNumber=[${applicationNumber}] address=[${address}] description=[${description}] decisionDate=[${decisionDate}]`);
         }
     }
