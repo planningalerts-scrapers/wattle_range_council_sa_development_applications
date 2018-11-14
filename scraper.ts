@@ -32,7 +32,7 @@ async function initializeDatabase() {
     return new Promise((resolve, reject) => {
         let database = new sqlite3.Database("data.sqlite");
         database.serialize(() => {
-            database.run("create table if not exists [data] ([council_reference] text primary key, [address] text, [description] text, [info_url] text, [comment_url] text, [date_scraped] text, [date_received] text)");
+            database.run("create table if not exists [data] ([council_reference] text primary key, [address] text, [description] text, [info_url] text, [comment_url] text, [date_scraped] text)");
             resolve(database);
         });
     });
@@ -49,17 +49,16 @@ async function insertRow(database, developmentApplication) {
             developmentApplication.description,
             developmentApplication.informationUrl,
             developmentApplication.commentUrl,
-            developmentApplication.scrapeDate,
-            developmentApplication.receivedDate
+            developmentApplication.scrapeDate
         ], function(error, row) {
             if (error) {
                 console.error(error);
                 reject(error);
             } else {
                 if (this.changes > 0)
-                    console.log(`    Inserted: application \"${developmentApplication.applicationNumber}\" with address \"${developmentApplication.address}\", description \"${developmentApplication.description}\" and received date \"${developmentApplication.receivedDate}\" into the database.`);
+                    console.log(`    Inserted: application \"${developmentApplication.applicationNumber}\" with address \"${developmentApplication.address}\" and description \"${developmentApplication.description}\" into the database.`);
                 else
-                    console.log(`    Skipped: application \"${developmentApplication.applicationNumber}\" with address \"${developmentApplication.address}\", description \"${developmentApplication.description}\" and received date \"${developmentApplication.receivedDate}\" because it was already present in the database.`);
+                    console.log(`    Skipped: application \"${developmentApplication.applicationNumber}\" with address \"${developmentApplication.address}\" and description \"${developmentApplication.description}\" because it was already present in the database.`);
                 sqlStatement.finalize();  // releases any locks
                 resolve(row);
             }
@@ -673,8 +672,17 @@ async function parsePdf(url: string) {
                 description = "NO DESCRIPTION PROVIDED";
             
             let decisionDate = moment(decisionDateText.replace(/\./g, "/"), "D/MM/YYYY", true);
-                
+
             console.log(`applicationNumber=[${applicationNumber}] address=[${address}] description=[${description}] decisionDate=[${decisionDate}]`);
+
+            developmentApplications.push({
+                applicationNumber: applicationNumber,
+                address: address,
+                description: ((description === "") ? "NO DESCRIPTION PROVIDED" : description),
+                informationUrl: url,
+                commentUrl: CommentUrl,
+                scrapeDate: moment().format("YYYY-MM-DD")
+            });        
         }
     }
 
