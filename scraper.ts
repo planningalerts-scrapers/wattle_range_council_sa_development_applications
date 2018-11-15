@@ -6,14 +6,12 @@
 
 "use strict";
 
-import * as fs from "fs";
 import * as cheerio from "cheerio";
 import * as request from "request-promise-native";
 import * as sqlite3 from "sqlite3";
 import * as urlparser from "url";
 import * as moment from "moment";
 import * as pdfjs from "pdfjs-dist";
-import * as didyoumean from "didyoumean2";
 
 sqlite3.verbose();
 
@@ -21,10 +19,6 @@ const DevelopmentApplicationsUrl = "https://www.wattlerange.sa.gov.au/page.aspx?
 const CommentUrl = "mailto:council@wattlerange.sa.gov.au";
 
 declare const process: any;
-
-// All valid suburb names.
-
-let SuburbNames = null;
 
 // Sets up an sqlite database.
 
@@ -94,21 +88,6 @@ interface Cell extends Rectangle {
     elements: Element[]
 }
 
-// Gets the highest Y co-ordinate of all elements that are considered to be in the same row as
-// the specified element.  Take care to avoid extremely tall elements (because these may otherwise
-// be considered as part of all rows and effectively force the return value of this function to
-// the same value, regardless of the value of startElement).
-
-function getRowTop(elements: Element[], startElement: Element) {
-    let top = startElement.y;
-    for (let element of elements)
-        if (element.y < startElement.y + startElement.height && element.y + element.height > startElement.y)  // check for overlap
-            if (getVerticalOverlapPercentage(startElement, element) > 50)  // avoids extremely tall elements
-                if (element.y < top)
-                    top = element.y;
-    return top;
-}
-
 // Constructs a rectangle based on the intersection of the two specified rectangles.
 
 function intersect(rectangle1: Rectangle, rectangle2: Rectangle): Rectangle {
@@ -135,22 +114,6 @@ function contains(containerRectangle: Rectangle, containedRectangle: Rectangle) 
 
 function getArea(rectangle: Rectangle) {
     return rectangle.width * rectangle.height;
-}
-
-// Calculates the square of the Euclidean distance between two elements.
-
-function calculateDistance(element1: Element, element2: Element) {
-    let point1 = { x: element1.x + element1.width, y: element1.y + element1.height / 2 };
-    let point2 = { x: element2.x, y: element2.y + element2.height / 2 };
-    if (point2.x < point1.x - element1.width / 5)  // arbitrary overlap factor of 20% (ie. ignore elements that overlap too much in the horizontal direction)
-        return Number.MAX_VALUE;
-    return (point2.x - point1.x) ** 2 + (point2.y - point1.y) ** 2;
-}
-
-// Determines whether there is vertical overlap between two elements.
-
-function isVerticalOverlap(element1: Element, element2: Element) {
-    return element2.y < element1.y + element1.height && element2.y + element2.height > element1.y;
 }
 
 // Gets the percentage of vertical overlap between two elements (0 means no overlap and 100 means
@@ -183,218 +146,6 @@ function getHorizontalOverlapPercentage(rectangle1: Rectangle, rectangle2: Recta
     let unionWidth = Math.max(endX1, endX2) - Math.min(startX1, startX2);
 
     return (intersectionWidth * 100) / unionWidth;
-}
-
-// Gets the element immediately to the right of the specified element (but ignores elements that
-// appear after a large horizontal gap).
-
-function getRightElement(elements: Element[], element: Element) {
-    let closestElement: Element = { text: undefined, x: Number.MAX_VALUE, y: Number.MAX_VALUE, width: 0, height: 0 };
-    for (let rightElement of elements)
-        if (isVerticalOverlap(element, rightElement) &&  // ensure that there is at least some vertical overlap
-            getVerticalOverlapPercentage(element, rightElement) > 50 &&  // avoid extremely tall elements (ensure at least 50% overlap)
-            (rightElement.x > element.x + element.width) &&  // ensure the element actually is to the right
-            (rightElement.x - (element.x + element.width) < 30) &&  // avoid elements that appear after a large gap (arbitrarily ensure less than a 30 pixel gap horizontally)
-            calculateDistance(element, rightElement) < calculateDistance(element, closestElement))  // check if closer than any element encountered so far
-            closestElement = rightElement;
-    return (closestElement.text === undefined) ? undefined : closestElement;
-}
-
-// Formats (and corrects) an address.
-
-function formatAddress(address: string) {
-    address = address.trim();
-    if (address === "")
-        return "";
-
-    // Pop tokens from the end of the array until a valid suburb name is encountered (allowing
-    // for a few spelling errors).
-
-    let tokens = address.split(" ");
-
-    let suburbName: string = null;
-    for (let index = 1; index <= 4; index++) {
-        let suburbNameMatch = didyoumean(tokens.slice(-index).join(" "), Object.keys(SuburbNames), { caseSensitive: false, returnType: "first-closest-match", thresholdType: "edit-distance", threshold: 2, trimSpace: true });
-        if (suburbNameMatch !== null) {
-            suburbName = SuburbNames[suburbNameMatch];
-            tokens.splice(-index, index);  // remove elements from the end of the array           
-            break;
-        }
-    }
-
-    if (suburbName === null) {  // suburb name not found (or not recognised)
-        console.log(`The state and post code will not be added because the suburb was not recognised: ${address}`);
-        return address;
-    }
-
-    // Add the suburb name with its state and post code to the street name.
-
-    let streetName = tokens.join(" ").trim();
-    if (streetName.endsWith(","))
-        streetName = streetName.slice(0, -1);
-    return (streetName + ((streetName === "") ? "" : ", ") + suburbName.toUpperCase()).trim();
-}
-
-// Parses the details from the elements associated with a single development application.
-
-function parseApplicationElements(elements: Element[], startElement: Element, applicantElement: Element, applicationElement: Element, proposalElement: Element, referralsElement: Element, informationUrl: string) {
-    // Get the application number.
-
-    let xComparer = (a, b) => (a.x > b.x) ? 1 : ((a.x < b.x) ? -1 : 0);
-    let applicationNumberElements = elements
-        .filter(element => element.x < applicantElement.x && element.y < startElement.y + 2 * startElement.height)
-        .sort(xComparer);
-
-    let applicationNumber = undefined;
-    for (let index = 1; index <= applicationNumberElements.length; index++) {
-        let text = applicationNumberElements.slice(0, index).map(element => element.text).join("").replace(/\s/g, "");
-        if (/\/[0-9]{4}$/.test(text)) {
-            applicationNumber = text;
-            break;
-        }
-    }
-    if (applicationNumber === undefined) {
-        let elementSummary = elements.map(element => `[${element.text}]`).join("");
-        console.log(`Could not find the application number on the PDF page for the current development application.  The development application will be ignored.  Elements: ${elementSummary}`);
-        return undefined;
-    }
-    console.log(`    Found \"${applicationNumber}\".`);
-
-    // Get the application date element (text to the right of this constitutes the address).
-
-    let applicationDateElement: Element = undefined;
-    let applicationDateRectangle : Rectangle = { x: applicationElement.x, y: 0, width: applicationElement.width, height : applicationElement.height };
-    for (let element of elements) {
-        applicationDateRectangle.y = element.y;
-        if (getArea(element) > 0 &&  // ensure a valid element
-            getArea(element) > 0.5 * getArea(applicationDateRectangle) &&  // ensure that the element is approximately the same size (within 50%) as what is expected for the date rectangle
-            getArea(intersect(element, applicationDateRectangle)) > 0.75 * getArea(element)) {  // determine if the element mostly overlaps (by more than 75%) the rectangle where the date is expected to appear
-            applicationDateElement = element;
-            break;
-        }
-    }
-    if (applicationDateElement === undefined) {
-        let elementSummary = elements.map(element => `[${element.text}]`).join("");
-        console.log(`Could not find the application date on the PDF page for the current development application.  The development application will be ignored.  Elements: ${elementSummary}`);
-        return undefined;
-    }
-
-    // Get the received date.
-
-    let receivedDateElement: Element = undefined;
-    let receivedDateRectangle : Rectangle = { x: applicationElement.x, y: 0, width: applicationElement.width, height : applicationElement.height };
-    for (let element of elements) {
-        receivedDateRectangle.y = element.y;
-        if (getArea(element) > 0 &&  // ensure a valid element
-            getArea(element) > 0.5 * getArea(receivedDateRectangle) &&  // ensure that the element is approximately the same size (within 50%) as what is expected for the date rectangle
-            getArea(intersect(element, receivedDateRectangle)) > 0.75 * getArea(element) &&  // determine if the element mostly overlaps (by more than 75%) the rectangle where the date is expected to appear
-            element.y > applicationDateElement.y + applicationDateElement.height &&  // ignore the application date (the recieved date appears futher down)
-            moment(element.text.trim(), "D/MM/YYYY", true).isValid()) {  // ensure that "Received" and "Date" text are ignored (keep searching until a valid date is found)
-            receivedDateElement = element;
-            break;
-        }
-    }
-
-    if (receivedDateElement === undefined)
-        receivedDateElement = applicationDateElement;  // fallback to the application date
-
-    let receivedDate = moment(applicationDateElement.text.trim(), "D/MM/YYYY", true);
-    
-    // Get the address (to the right of the application date element and to the left of the
-    // "Proposal" column heading).  The address seems to always be a single line.
-
-    let address = elements
-        .filter(element =>
-            element.x > applicationDateElement.x + applicationDateElement.width &&  // the address elements must be to the right of the application date
-            getVerticalOverlapPercentage(applicationDateElement, element) > 50 &&  // the address element must overlap vertically with the application date element
-            element.x < proposalElement.x - proposalElement.height / 2)  // the address element must be at least a little to the left of the "Proposal" heading text (arbitrarily use half the height)
-        .sort(xComparer)
-        .map(element => element.text)
-        .join("");
-
-    address = formatAddress(address);  // add the state and post code to the address
-
-    // Get the description.
-
-    let description = "";
-
-    if (referralsElement !== undefined) {
-        let descriptionElements = elements
-            .filter(element =>
-                element.x > proposalElement.x - proposalElement.height / 2 &&  // the description elements may start at least a little to the left to the "Proposal" heading
-                element.x < referralsElement.x);  // the description elements are to the left of the "Referrals/" heading
-        
-        let previousY = undefined;
-        for (let descriptionElement of descriptionElements) {
-            if (previousY !== undefined && descriptionElement.y > previousY + descriptionElement.height / 2)  // a new line
-                description += " ";
-            description += descriptionElement.text;
-            previousY = descriptionElement.y;
-        }
-    }
-
-    return {
-        applicationNumber: applicationNumber,
-        address: address,
-        description: ((description.trim() === "") ? "No Description Provided" : description),
-        informationUrl: informationUrl,
-        commentUrl: CommentUrl,
-        scrapeDate: moment().format("YYYY-MM-DD"),
-        receivedDate: (receivedDate !== undefined && receivedDate.isValid()) ? receivedDate.format("YYYY-MM-DD") : ""
-    };
-}
-
-// Finds the start element of each development application on the current PDF page (there are
-// typically many development applications on a single page and each development application
-// typically begins with the text "Lodgement").
-
-function findStartElements(elements: Element[]) {
-    // Examine all the elements on the page that being with "L" or "l".
-    
-    let startElements: Element[] = [];
-    for (let element of elements.filter(element => element.text.trim().toLowerCase().startsWith("l"))) {
-        // Extract up to 10 elements to the right of the element that has text starting with the
-        // letter "l" (and so may be the start of the "Lodgement" text).  Join together the
-        // elements to the right in an attempt to find the best match to "Lodgement".
-
-        let rightElement = element;
-        let rightElements: Element[] = [];
-        let matches = [];
-
-        do {
-            rightElements.push(rightElement);
-        
-            let text = rightElements.map(element => element.text).join("").replace(/\s/g, "").toLowerCase();
-            if (text.length >= 10)  // stop once the text is too long
-                break;
-            if (text.length >= 8) {  // ignore until the text is close to long enough
-                if (text === "lodgement")
-                    matches.push({ element: rightElement, threshold: 0 });
-                else if (didyoumean(text, [ "Lodgement" ], { caseSensitive: false, returnType: "first-closest-match", thresholdType: "edit-distance", threshold: 1, trimSpace: true }) !== null)
-                    matches.push({ element: rightElement, threshold: 1 });
-                else if (didyoumean(text, [ "Lodgement" ], { caseSensitive: false, returnType: "first-closest-match", thresholdType: "edit-distance", threshold: 2, trimSpace: true }) !== null)
-                    matches.push({ element: rightElement, threshold: 2 });
-            }
-
-            rightElement = getRightElement(elements, rightElement);
-        } while (rightElement !== undefined && rightElements.length < 10);
-
-        // Chose the best match (if any matches were found).
-
-        if (matches.length > 0) {
-            let bestMatch = matches.reduce((previous, current) =>
-                (previous === undefined ||
-                previous.threshold < current.threshold ||
-                (previous.threshold === current.threshold && Math.abs(previous.text.length - "Lodgement".length) <= Math.abs(current.text.length - "Lodgement".length)) ? current : previous), undefined);
-            startElements.push(bestMatch.element);
-        }
-    }
-
-    // Ensure the start elements are sorted in the order that they appear on the page.
-
-    let yComparer = (a, b) => (a.y > b.y) ? 1 : ((a.y < b.y) ? -1 : 0);
-    startElements.sort(yComparer);
-    return startElements;
 }
 
 // Parses a PDF document.
@@ -666,7 +417,6 @@ async function parsePdf(url: string) {
             if (!/[0-9]+\/[0-9]+\/[0-9]/.test(applicationNumber))
                 continue;
 
-            address = formatAddress(address);
             if (address === "")
                 continue;
 
@@ -709,12 +459,6 @@ async function main() {
     // Ensure that the database exists.
 
     let database = await initializeDatabase();
-
-    // Read the files containing all possible suburb names.
-
-    SuburbNames = {};
-    for (let suburb of fs.readFileSync("suburbnames.txt").toString().replace(/\r/g, "").trim().split("\n"))
-        SuburbNames[suburb.split(",")[0]] = suburb.split(",")[1];
 
     // Retrieve the page that contains the links to the PDFs.
 
