@@ -1,0 +1,56 @@
+Beachport,Beachport SA 5280
+Benara,Benara SA 5291
+Benara Flat,Benara Flat SA 5280
+Bool Lagoon,Bool Lagoon SA 5271
+Bray,Bray SA 5276
+Burrungule,Burrungule SA 5291
+Canunda,Canunda SA 5291
+Clay Wells,Clay Wells SA 5280
+Comaum,Comaum SA 5277
+Coonawarra,Coonawarra SA 5263
+Furner,Furner SA 5280
+German Flat,German Flat SA 5280
+Glencoe,Glencoe SA 5291
+Glencoe West,Glencoe West SA 5291
+Glenroy,Glenroy SA 5277
+Grey,Grey SA 5280
+Hatherleigh,Hatherleigh SA 5280
+Kalangadoo,Kalangadoo SA 5278
+Kangaroo Inn,Kangaroo Inn SA 5280
+Katnook,Katnook SA 5277
+Killanoola,Killanoola SA 5271
+Kirip,Kirip SA 5291
+Koorine,Koorine SA 5279
+Krongart,Krongart SA 5278
+Leggs Lane,Leggs Lane SA 5280
+Maaoupe,Maaoupe SA 5277
+Magarey,Magarey SA 5280
+Millicent,Millicent SA 5280
+Moerlong,Moerlong SA 5278
+Monbulla,Monbulla SA 5277
+Mount Burr,Mount Burr SA 5279
+Mt.Burr,Mount Burr SA 5279
+Mount Graham,Mount Graham SA 5280
+Mt.Graham,Mount Graham SA 5280
+Mount McIntyre,Mount McIntyre SA 5279
+Mt.McIntyre,Mount McIntyre SA 5279
+Mount Muirhead,Mount Muirhead SA 5280
+Mt.Muirhead,Mount Muirhead SA 5280
+Nangula,Nangula SA 5280
+Nangwarry,Nangwarry SA 5277
+Nora Creina,Nora Creina SA 5276
+Penola,Penola SA 5277
+Pompoon,Pompoon SA 5280
+Rendelsham,Rendelsham SA 5280
+Rivoli Bay,Rivoli Bay SA 5280
+Rocky Camp,Rocky Camp SA 5280
+Sebastopol,Sebastopol SA 5280
+Short,Short SA 5279
+Snuggery,Snuggery SA 5280
+Southend,Southend SA 5280
+Tantanoola,Tantanoola SA 5280
+Thornlea,Thornlea SA 5280
+Wattle Range,Wattle Range SA 5280
+Wattle Range East,Wattle Range East SA 5279
+Wepar,Wepar SA 5278
+Wyrie,Wyrie SA 5280

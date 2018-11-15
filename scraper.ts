@@ -212,7 +212,7 @@ function formatAddress(address: string) {
 
     let tokens = address.split(" ");
 
-    let suburbName = null;
+    let suburbName: string = null;
     for (let index = 1; index <= 4; index++) {
         let suburbNameMatch = didyoumean(tokens.slice(-index).join(" "), Object.keys(SuburbNames), { caseSensitive: false, returnType: "first-closest-match", thresholdType: "edit-distance", threshold: 2, trimSpace: true });
         if (suburbNameMatch !== null) {
@@ -230,7 +230,9 @@ function formatAddress(address: string) {
     // Add the suburb name with its state and post code to the street name.
 
     let streetName = tokens.join(" ").trim();
-    return (streetName + ((streetName === "") ? "" : ", ") + suburbName).trim();
+    if (streetName.endsWith(","))
+        streetName = streetName.slice(0, -1);
+    return (streetName + ((streetName === "") ? "" : ", ") + suburbName.toUpperCase()).trim();
 }
 
 // Parses the details from the elements associated with a single development application.
@@ -711,8 +713,8 @@ async function main() {
     // Read the files containing all possible suburb names.
 
     SuburbNames = {};
-    // for (let suburb of fs.readFileSync("suburbnames.txt").toString().replace(/\r/g, "").trim().split("\n"))
-    //     SuburbNames[suburb.split(",")[0]] = suburb.split(",")[1];
+    for (let suburb of fs.readFileSync("suburbnames.txt").toString().replace(/\r/g, "").trim().split("\n"))
+        SuburbNames[suburb.split(",")[0]] = suburb.split(",")[1];
 
     // Retrieve the page that contains the links to the PDFs.
 
