@@ -1,0 +1,82 @@
+Benara
+  German Flat
+Comaum
+  Glenroy
+  Comaum
+  Coonawarra
+Grey
+  Moerlong
+  Krongart
+  Kalangadoo
+  Wepar
+  Mount McIntyre
+Hindmarsh
+  Tantanoola
+  Millicent
+  Mount McIntyre
+  Koorine
+  Glencoe
+  Burrungule
+Kennion
+  Kangaroo Inn
+  Clay Wells
+  Furner
+  Hatherleigh
+Killanoola
+  Maaoupe
+  Bool Lagoon
+  Glenroy
+Lake George
+  Nora Creina
+  Bray
+  Beachport
+  Magarey
+Mayurra
+  Canunda
+  Millicent
+  Tantanoola
+  German Flat
+Monbulla
+  Wattle Range East
+  Monbulla
+Mount Muirhead
+  Hatherleigh
+  Furner
+  Wattle Range
+  Sebastopol
+  Rendelsham
+  Mount Burr
+  Millicent
+  Rocky Camp
+  Canunda
+Nangwarry
+  Nangwarry
+Penola
+  Penola
+Riddoch
+  Wattle Range
+  Mount Burr
+  Mount McIntyre
+  Koorine
+Rivoli Bay
+  Beachport
+  Magarey
+  Thornlea
+  Rendelsham
+  Hatherleigh
+  Southend
+  Canunda
+  Millicent
+Short
+  Short
+  Wattle Range
+Symon
+  Clay Wells
+  Kangaroo Inn
+  Thornlea
+  Magarey
+  Beachport
+Young
+  Burrungule
+  Koorine
+  Glencoe

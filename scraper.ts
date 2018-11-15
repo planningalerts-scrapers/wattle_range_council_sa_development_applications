@@ -410,8 +410,8 @@ async function parsePdf(url: string) {
             let rowDecisionDateCell = row.find(cell => getHorizontalOverlapPercentage(cell, decisionDateCell) > 90);
 
             let applicationNumber = rowApplicationNumberCell.elements.map(element => element.text).join("").trim();
-            let address = rowAddressCell.elements.map(element => element.text).join("").trim();
-            let description = (rowDescriptionCell === undefined) ? "" : rowDescriptionCell.elements.map(element => element.text).join("").trim();
+            let address = rowAddressCell.elements.map(element => element.text).join("").replace(/ü/g, " ").replace(/\s\s+/g, " ").trim();
+            let description = (rowDescriptionCell === undefined) ? "" : rowDescriptionCell.elements.map(element => element.text).join("").replace(/\s\s+/g, " ").trim();
             let decisionDateText = (rowDecisionDateCell === undefined) ? "" : rowDecisionDateCell.elements.map(element => element.text).join("").trim();
 
             if (!/[0-9]+\/[0-9]+\/[0-9]/.test(applicationNumber))
@@ -486,15 +486,17 @@ async function main() {
     // at once because this may use too much memory, resulting in morph.io terminating the current
     // process).
 
-    let selectedPdfUrls: string[] = [];
-    selectedPdfUrls.push(pdfUrls.shift());
-    if (pdfUrls.length > 0)
-        selectedPdfUrls.push(pdfUrls[getRandom(1, pdfUrls.length)]);
-    if (getRandom(0, 2) === 0)
-        selectedPdfUrls.reverse();
+let selectedPdfUrls = pdfUrls;
 
-console.log("Testing PDF.");
-selectedPdfUrls = [ "https://www.wattlerange.sa.gov.au/webdata/resources/files/Stats%20March%2018.pdf" ];
+    // let selectedPdfUrls: string[] = [];
+    // selectedPdfUrls.push(pdfUrls.shift());
+    // if (pdfUrls.length > 0)
+    //     selectedPdfUrls.push(pdfUrls[getRandom(1, pdfUrls.length)]);
+    // if (getRandom(0, 2) === 0)
+    //     selectedPdfUrls.reverse();
+
+// console.log("Testing PDF.");
+// selectedPdfUrls = [ "https://www.wattlerange.sa.gov.au/webdata/resources/files/Stats%20May%2015.pdf" ];
 
     for (let pdfUrl of selectedPdfUrls) {
         console.log(`Parsing document: ${pdfUrl}`);
