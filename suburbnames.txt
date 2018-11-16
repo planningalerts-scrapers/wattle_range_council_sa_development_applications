@@ -21,13 +21,7 @@ Millicent,Millicent SA 5280,Hindmarsh;Mayurra;Mount Muirhead;Rivoli Bay
 Moerlong,Moerlong SA 5278,Grey
 Monbulla,Monbulla SA 5277,Monbulla
 Mount Burr,Mount Burr SA 5279,Mount Muirhead;Riddoch
-Mt Burr,Mount Burr SA 5279,Mount Muirhead;Riddoch
-Mt.Burr,Mount Burr SA 5279,Mount Muirhead;Riddoch
-Mt. Burr,Mount Burr SA 5279,Mount Muirhead;Riddoch
 Mount McIntyre,Mount McIntyre SA 5279,Grey;Hindmarsh;Riddoch
-Mt McIntyre,Mount McIntyre SA 5279,Grey;Hindmarsh;Riddoch
-Mt.McIntyre,Mount McIntyre SA 5279,Grey;Hindmarsh;Riddoch
-Mt. McIntyre,Mount McIntyre SA 5279,Grey;Hindmarsh;Riddoch
 Nangwarry,Nangwarry SA 5277,Nangwarry
 Nora Creina,Nora Creina SA 5276,Lake George
 Penola,Penola SA 5277,Penola

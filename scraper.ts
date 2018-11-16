@@ -6,12 +6,14 @@
 
 "use strict";
 
+import * as fs from "fs";
 import * as cheerio from "cheerio";
 import * as request from "request-promise-native";
 import * as sqlite3 from "sqlite3";
 import * as urlparser from "url";
 import * as moment from "moment";
 import * as pdfjs from "pdfjs-dist";
+import * as didyoumean from "didyoumean2";
 
 sqlite3.verbose();
 
@@ -19,6 +21,11 @@ const DevelopmentApplicationsUrl = "https://www.wattlerange.sa.gov.au/page.aspx?
 const CommentUrl = "mailto:council@wattlerange.sa.gov.au";
 
 declare const process: any;
+
+// Address information.
+
+let SuburbNames = null;
+let HundredSuburbNames = null;
 
 // Sets up an sqlite database.
 
@@ -116,16 +123,6 @@ function getArea(rectangle: Rectangle) {
     return rectangle.width * rectangle.height;
 }
 
-// Gets the percentage of vertical overlap between two elements (0 means no overlap and 100 means
-// 100% overlap; and, for example, 20 means that 20% of the second element overlaps somewhere
-// with the first element).
-
-function getVerticalOverlapPercentage(element1: Element, element2: Element) {
-    let y1 = Math.max(element1.y, element2.y);
-    let y2 = Math.min(element1.y + element1.height, element2.y + element2.height);
-    return (y2 < y1) ? 0 : (((y2 - y1) * 100) / element2.height);
-}
-
 // Gets the percentage of horizontal overlap between two rectangles (0 means no overlap and 100
 // means 100% overlap).
 
@@ -146,6 +143,16 @@ function getHorizontalOverlapPercentage(rectangle1: Rectangle, rectangle2: Recta
     let unionWidth = Math.max(endX1, endX2) - Math.min(startX1, startX2);
 
     return (intersectionWidth * 100) / unionWidth;
+}
+
+// Format the address, ensuring that it has a valid suburb, state and post code.
+
+function formatAddress(address) {
+    let tokens = address.split(",");
+
+    let hundredNameMatch = didyoumean(tokens[tokens.length - 1], Object.keys(HundredSuburbNames), { caseSensitive: false, returnType: "first-closest-match", thresholdType: "edit-distance", threshold: 2, trimSpace: true });
+
+    return "";
 }
 
 // Parses a PDF document.
@@ -417,6 +424,7 @@ async function parsePdf(url: string) {
             if (!/[0-9]+\/[0-9]+\/[0-9]/.test(applicationNumber))
                 continue;
 
+            address = formatAddress(address);
             if (address === "")
                 continue;
 
@@ -456,6 +464,34 @@ function sleep(milliseconds: number) {
 // Parses the development applications.
 
 async function main() {
+    // Read the suburb names and hundred names.
+
+    SuburbNames = {};
+    HundredSuburbNames = {};
+    for (let line of fs.readFileSync("suburbnames.txt").toString().replace(/\r/g, "").trim().split("\n")) {
+        let suburbTokens = line.split(",");
+        
+        let suburbName = suburbTokens[0].trim();
+        SuburbNames[suburbName] = suburbTokens[1].trim();
+        if (suburbName.startsWith("Mount ")) {
+            SuburbNames["Mt " + suburbName.substring("Mount ".length)] = suburbTokens[1].trim();
+            SuburbNames["Mt." + suburbName.substring("Mount ".length)] = suburbTokens[1].trim();
+            SuburbNames["Mt. " + suburbName.substring("Mount ".length)] = suburbTokens[1].trim();
+        }
+
+        for (let hundredName of suburbTokens[2].split(";")) {
+            hundredName = hundredName.trim();
+            if (!(hundredName in HundredSuburbNames))
+                HundredSuburbNames[hundredName] = [];
+            HundredSuburbNames[hundredName].push(suburbTokens[1].trim());  // several suburbs may exist for the same hundred name
+            if (suburbName.startsWith("Mount ")) {
+                HundredSuburbNames["Mt " + hundredName.substring("Mount ".length)].push(suburbTokens[1].trim());  // several suburbs may exist for the same hundred name
+                HundredSuburbNames["Mt." + hundredName.substring("Mount ".length)].push(suburbTokens[1].trim());  // several suburbs may exist for the same hundred name
+                HundredSuburbNames["Mt. " + hundredName.substring("Mount ".length)].push(suburbTokens[1].trim());  // several suburbs may exist for the same hundred name
+            }
+        }
+    }
+
     // Ensure that the database exists.
 
     let database = await initializeDatabase();
