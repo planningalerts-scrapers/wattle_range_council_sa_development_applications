@@ -484,10 +484,22 @@ async function main() {
             if (!(hundredName in HundredSuburbNames))
                 HundredSuburbNames[hundredName] = [];
             HundredSuburbNames[hundredName].push(suburbTokens[1].trim());  // several suburbs may exist for the same hundred name
-            if (suburbName.startsWith("Mount ")) {
-                HundredSuburbNames["Mt " + hundredName.substring("Mount ".length)].push(suburbTokens[1].trim());  // several suburbs may exist for the same hundred name
-                HundredSuburbNames["Mt." + hundredName.substring("Mount ".length)].push(suburbTokens[1].trim());  // several suburbs may exist for the same hundred name
-                HundredSuburbNames["Mt. " + hundredName.substring("Mount ".length)].push(suburbTokens[1].trim());  // several suburbs may exist for the same hundred name
+
+            if (hundredName.startsWith("Mount ")) {
+                let mountHundredName = "Mt " + hundredName.substring("Mount ".length);
+                if (!(mountHundredName in HundredSuburbNames))
+                    HundredSuburbNames[mountHundredName] = [];
+                HundredSuburbNames[mountHundredName].push(suburbTokens[1].trim());  // several suburbs may exist for the same hundred name
+
+                mountHundredName = "Mt." + hundredName.substring("Mount ".length);
+                if (!(mountHundredName in HundredSuburbNames))
+                    HundredSuburbNames[mountHundredName] = [];
+                HundredSuburbNames[mountHundredName].push(suburbTokens[1].trim());  // several suburbs may exist for the same hundred name
+
+                mountHundredName = "Mt. " + hundredName.substring("Mount ".length);
+                if (!(mountHundredName in HundredSuburbNames))
+                    HundredSuburbNames[mountHundredName] = [];
+                HundredSuburbNames[mountHundredName].push(suburbTokens[1].trim());  // several suburbs may exist for the same hundred name
             }
         }
     }
