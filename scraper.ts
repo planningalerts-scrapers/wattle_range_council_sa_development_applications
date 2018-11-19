@@ -150,7 +150,24 @@ function getHorizontalOverlapPercentage(rectangle1: Rectangle, rectangle2: Recta
 function formatAddress(address) {
     let tokens = address.split(",");
 
-    let hundredNameMatch = didyoumean(tokens[tokens.length - 1], Object.keys(HundredSuburbNames), { caseSensitive: false, returnType: "first-closest-match", thresholdType: "edit-distance", threshold: 2, trimSpace: true });
+    let token = tokens[tokens.length - 1].trim();
+    if (token.startsWith("HD "))
+        token = token.substring("HD ".length);
+
+    let hundredNameMatch1 = didyoumean(tokens[tokens.length - 1], Object.keys(HundredSuburbNames), { caseSensitive: false, returnType: "first-closest-match", thresholdType: "edit-distance", threshold: 2, trimSpace: true });
+    let hundredNameMatch2 = undefined;
+    let suburbNameMatch1 = undefined;
+
+    if (tokens.length >= 2) {
+        token = tokens[tokens.length - 2].trim();
+        if (token.startsWith("HD ")) {
+            token = token.substring("HD ".length);
+            let hundredNameMatch2 = didyoumean(token, Object.keys(HundredSuburbNames), { caseSensitive: false, returnType: "first-closest-match", thresholdType: "edit-distance", threshold: 2, trimSpace: true });
+        } else {
+            let suburbNameMatch1 = didyoumean(token, Object.keys(SuburbNames), { caseSensitive: false, returnType: "first-closest-match", thresholdType: "edit-distance", threshold: 2, trimSpace: true });
+            console.log(suburbNameMatch1);
+        }
+    }
 
     return "";
 }
@@ -179,7 +196,7 @@ async function parsePdf(url: string) {
         let operators = await page.getOperatorList();
 
         // Find the lines.  Each line is actually constructed using a rectangle with a very short
-        // height or a  very narrow width.
+        // height or a very narrow width.
 
         let lines: Rectangle[] = [];
 
@@ -481,25 +498,14 @@ async function main() {
 
         for (let hundredName of suburbTokens[2].split(";")) {
             hundredName = hundredName.trim();
-            if (!(hundredName in HundredSuburbNames))
-                HundredSuburbNames[hundredName] = [];
-            HundredSuburbNames[hundredName].push(suburbTokens[1].trim());  // several suburbs may exist for the same hundred name
-
+            (HundredSuburbNames[hundredName] || (HundredSuburbNames[hundredName] = [])).push(suburbTokens[1].trim());  // several suburbs may exist for the same hundred name
             if (hundredName.startsWith("Mount ")) {
                 let mountHundredName = "Mt " + hundredName.substring("Mount ".length);
-                if (!(mountHundredName in HundredSuburbNames))
-                    HundredSuburbNames[mountHundredName] = [];
-                HundredSuburbNames[mountHundredName].push(suburbTokens[1].trim());  // several suburbs may exist for the same hundred name
-
+                (HundredSuburbNames[mountHundredName] || (HundredSuburbNames[mountHundredName] = [])).push(suburbTokens[1].trim());  // several suburbs may exist for the same hundred name
                 mountHundredName = "Mt." + hundredName.substring("Mount ".length);
-                if (!(mountHundredName in HundredSuburbNames))
-                    HundredSuburbNames[mountHundredName] = [];
-                HundredSuburbNames[mountHundredName].push(suburbTokens[1].trim());  // several suburbs may exist for the same hundred name
-
+                (HundredSuburbNames[mountHundredName] || (HundredSuburbNames[mountHundredName] = [])).push(suburbTokens[1].trim());  // several suburbs may exist for the same hundred name
                 mountHundredName = "Mt. " + hundredName.substring("Mount ".length);
-                if (!(mountHundredName in HundredSuburbNames))
-                    HundredSuburbNames[mountHundredName] = [];
-                HundredSuburbNames[mountHundredName].push(suburbTokens[1].trim());  // several suburbs may exist for the same hundred name
+                (HundredSuburbNames[mountHundredName] || (HundredSuburbNames[mountHundredName] = [])).push(suburbTokens[1].trim());  // several suburbs may exist for the same hundred name
             }
         }
     }
