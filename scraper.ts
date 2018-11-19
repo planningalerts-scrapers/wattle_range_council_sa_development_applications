@@ -162,13 +162,17 @@ function formatAddress(address) {
         token = tokens[tokens.length - 2].trim();
         if (token.startsWith("HD ")) {
             token = token.substring("HD ".length);
-            let hundredNameMatch2 = didyoumean(token, Object.keys(HundredSuburbNames), { caseSensitive: false, returnType: "first-closest-match", thresholdType: "edit-distance", threshold: 2, trimSpace: true });
+            hundredNameMatch2 = didyoumean(token, Object.keys(HundredSuburbNames), { caseSensitive: false, returnType: "first-closest-match", thresholdType: "edit-distance", threshold: 2, trimSpace: true });
         } else {
-            let suburbNameMatch1 = didyoumean(token, Object.keys(SuburbNames), { caseSensitive: false, returnType: "first-closest-match", thresholdType: "edit-distance", threshold: 2, trimSpace: true });
-            console.log(suburbNameMatch1);
+            suburbNameMatch1 = didyoumean(token, Object.keys(SuburbNames), { caseSensitive: false, returnType: "first-closest-match", thresholdType: "edit-distance", threshold: 2, trimSpace: true });
         }
     }
 
+    console.log(`hundredNameMatch1=${hundredNameMatch1}, hundredNameMatch2=${hundredNameMatch2}, suburbNameMatch1=${suburbNameMatch1}`);
+    if (hundredNameMatch1 !== undefined)
+        console.log(`    1:${hundredNameMatch1}=${HundredSuburbNames[hundredNameMatch1].join(", ")}`);
+    if (hundredNameMatch2 !== undefined)
+        console.log(`    2:${hundredNameMatch2}=${HundredSuburbNames[hundredNameMatch2].join(", ")}`);
     return "";
 }
 

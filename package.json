@@ -6,6 +6,7 @@
   "main": "scraper.js",
   "dependencies": {
     "cheerio": "^0.22.0",
+    "didyoumean2": "^1.3.0",
     "fs": "0.0.1-security",
     "moment": "^2.22.2",
     "path": "^0.12.7",
