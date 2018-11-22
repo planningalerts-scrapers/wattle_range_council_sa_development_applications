@@ -147,18 +147,91 @@ function getHorizontalOverlapPercentage(rectangle1: Rectangle, rectangle2: Recta
     return (intersectionWidth * 100) / unionWidth;
 }
 
+// Formats the text as a street.  If the text is not recognised as a street then undefined is
+// returned.
+
+function formatStreet(text) {
+    if (text === undefined)
+        return undefined;
+
+    text = text.trim().toUpperCase();
+    let tokens = text.split(" ");
+
+    // Parse the street suffix (this recognises both "ST" and "STREET").
+
+    let token = tokens.pop();
+    let streetSuffix = StreetSuffixes[token];
+    if (streetSuffix === undefined)
+        streetSuffix = Object.values(StreetSuffixes).find(streetSuffix => streetSuffix === token);
+
+    // The text is not considered to be a valid street if it has no street suffix.
+
+    if (streetSuffix === undefined)
+        return undefined;
+
+    // Add back the expanded street suffix (for example, this converts "ST" to "STREET").
+
+    tokens.push(streetSuffix);
+
+    // Pop tokens from the end of the array until a valid street name is encountered.
+
+    for (let index = 4; index >= 2; index--) {
+        let suburbNames = StreetNames[tokens.slice(-index).join(" ")];
+        if (suburbNames !== undefined)
+            return { streetName: tokens.join(" "), suburbNames: suburbNames };  // reconstruct the street with the leading house number (and any other prefix text)
+    }
+
+    // Pop tokens from the end of the array until a valid street name is encountered (allowing
+    // for a spelling error).
+
+    for (let index = 4; index >= 2; index--) {
+        let streetNameMatch = didyoumean(tokens.slice(-index).join(" "), Object.keys(StreetNames), { caseSensitive: false, returnType: "first-closest-match", thresholdType: "edit-distance", threshold: 1, trimSpace: true });
+        if (streetNameMatch !== null) {
+            let suburbNames = StreetNames[streetNameMatch];
+            tokens.splice(-index, index);  // remove elements from the end of the array           
+            return { streetName: (tokens.join(" ") + " " + streetNameMatch).trim(), suburbNames: suburbNames };  // reconstruct the street with the leading house number (and any other prefix text)
+        }
+    }
+
+    return undefined;
+}
+
 // Format the address, ensuring that it has a valid suburb, state and post code.
 
 function formatAddress(address) {
+    // Handle the special case of a "ü" character in a string.  This means that the string actually
+    // contains multiple addresses (so make a best effort to extract one of the addresses).  For
+    // example,
+    //
+    //     5ü5A RALSTONüRALSTON STüST, PENOLAüPENOLA, PENOLA
+    //
+    // contains the following addresses,
+    //
+    //     5 RALSTON ST, PENOLA
+    //     5A RALSTON ST, PENOLA
+    //
+    // And, for example,
+    //
+    //     26ü WOOLSHEDü_ ROADü, GLENCOEüYOUNG, YOUNG
+    //
+    // contains the following addresses,
+    //
+    //     26 WOOLSHED ROAD, GLENCOE, YOUNG
+    //     _, YOUNG, YOUNG
+
+    if (address.includes("ü")) {
+        // ...
+    }
+
     let tokens = address.split(",");
 
     let token = tokens[tokens.length - 1].trim();
     if (token.startsWith("HD "))
         token = token.substring("HD ".length);
 
-    let hundredNameMatch1 = didyoumean(tokens[tokens.length - 1], Object.keys(HundredSuburbNames), { caseSensitive: false, returnType: "first-closest-match", thresholdType: "edit-distance", threshold: 2, trimSpace: true });
-    let hundredNameMatch2 = undefined;
-    let suburbNameMatch1 = undefined;
+    let hundredNameMatch1 = didyoumean(token, Object.keys(HundredSuburbNames), { caseSensitive: false, returnType: "first-closest-match", thresholdType: "edit-distance", threshold: 2, trimSpace: true });
+    let hundredNameMatch2 = null;
+    let suburbNameMatch1 = null;
 
     if (tokens.length >= 2) {
         token = tokens[tokens.length - 2].trim();
@@ -171,10 +244,22 @@ function formatAddress(address) {
     }
 
     console.log(`hundredNameMatch1=${hundredNameMatch1}, hundredNameMatch2=${hundredNameMatch2}, suburbNameMatch1=${suburbNameMatch1}`);
-    if (hundredNameMatch1 !== undefined)
+    if (hundredNameMatch1 !== null)
         console.log(`    1:${hundredNameMatch1}=${HundredSuburbNames[hundredNameMatch1].join(", ")}`);
-    if (hundredNameMatch2 !== undefined)
+    if (hundredNameMatch2 !== null)
         console.log(`    2:${hundredNameMatch2}=${HundredSuburbNames[hundredNameMatch2].join(", ")}`);
+
+    let streetNameMatch1 = formatStreet(tokens[tokens.length - 1]);
+    let streetNameMatch2 = formatStreet(tokens[tokens.length - 2]);
+    let streetNameMatch3 = formatStreet(tokens[tokens.length - 3]);
+
+    if (streetNameMatch1 !== undefined)
+        console.log(`        streetNameMatch1=${streetNameMatch1.streetName}; ${streetNameMatch1.suburbNames}`);
+    if (streetNameMatch2 !== undefined)
+        console.log(`        streetNameMatch2=${streetNameMatch2.streetName}; ${streetNameMatch2.suburbNames}`);
+    if (streetNameMatch3 !== undefined)
+        console.log(`        streetNameMatch3=${streetNameMatch3.streetName}; ${streetNameMatch3.suburbNames}`);
+
     return "";
 }
 
@@ -440,7 +525,7 @@ async function parsePdf(url: string) {
             let rowDecisionDateCell = row.find(cell => getHorizontalOverlapPercentage(cell, decisionDateCell) > 90);
 
             let applicationNumber = rowApplicationNumberCell.elements.map(element => element.text).join("").trim();
-            let address = rowAddressCell.elements.map(element => element.text).join("").replace(/ü/g, " ").replace(/\s\s+/g, " ").trim();
+            let address = rowAddressCell.elements.map(element => element.text).join("").replace(/\s\s+/g, " ").trim();
             let description = (rowDescriptionCell === undefined) ? "" : rowDescriptionCell.elements.map(element => element.text).join("").replace(/\s\s+/g, " ").trim();
             let decisionDateText = (rowDecisionDateCell === undefined) ? "" : rowDecisionDateCell.elements.map(element => element.text).join("").trim();
 
@@ -491,20 +576,18 @@ async function main() {
 
     StreetNames = {}
     for (let line of fs.readFileSync("streetnames.txt").toString().replace(/\r/g, "").trim().split("\n")) {
-        let streetNameTokens = line.split(",");
+        let streetNameTokens = line.toUpperCase().split(",");
         let streetName = streetNameTokens[0].trim();
         let suburbName = streetNameTokens[1].trim();
-        if (StreetNames[streetName] === undefined)
-            StreetNames[streetName] = [];
-        StreetNames[streetName].push(suburbName);  // several suburbs may exist for the same street name
+        (StreetNames[streetName] || (StreetNames[streetName] = [])).push(suburbName);  // several suburbs may exist for the same street name
     }
 
     // Read the street suffixes.
 
     StreetSuffixes = {};
     for (let line of fs.readFileSync("streetsuffixes.txt").toString().replace(/\r/g, "").trim().split("\n")) {
-        let streetSuffixTokens = line.split(",");
-        StreetSuffixes[streetSuffixTokens[0].trim().toLowerCase()] = streetSuffixTokens[1].trim();
+        let streetSuffixTokens = line.toUpperCase().split(",");
+        StreetSuffixes[streetSuffixTokens[0].trim()] = streetSuffixTokens[1].trim();
     }
 
     // Read the suburb names and hundred names.
@@ -512,25 +595,25 @@ async function main() {
     SuburbNames = {};
     HundredSuburbNames = {};
     for (let line of fs.readFileSync("suburbnames.txt").toString().replace(/\r/g, "").trim().split("\n")) {
-        let suburbTokens = line.split(",");
+        let suburbTokens = line.toUpperCase().split(",");
         
         let suburbName = suburbTokens[0].trim();
         SuburbNames[suburbName] = suburbTokens[1].trim();
-        if (suburbName.startsWith("Mount ")) {
-            SuburbNames["Mt " + suburbName.substring("Mount ".length)] = suburbTokens[1].trim();
-            SuburbNames["Mt." + suburbName.substring("Mount ".length)] = suburbTokens[1].trim();
-            SuburbNames["Mt. " + suburbName.substring("Mount ".length)] = suburbTokens[1].trim();
+        if (suburbName.startsWith("MOUNT ")) {
+            SuburbNames["MT " + suburbName.substring("MOUNT ".length)] = suburbTokens[1].trim();
+            SuburbNames["MT." + suburbName.substring("MOUNT ".length)] = suburbTokens[1].trim();
+            SuburbNames["MT. " + suburbName.substring("MOUNT ".length)] = suburbTokens[1].trim();
         }
 
         for (let hundredName of suburbTokens[2].split(";")) {
             hundredName = hundredName.trim();
             (HundredSuburbNames[hundredName] || (HundredSuburbNames[hundredName] = [])).push(suburbTokens[1].trim());  // several suburbs may exist for the same hundred name
-            if (hundredName.startsWith("Mount ")) {
-                let mountHundredName = "Mt " + hundredName.substring("Mount ".length);
+            if (hundredName.startsWith("MOUNT ")) {
+                let mountHundredName = "MT " + hundredName.substring("MOUNT ".length);
                 (HundredSuburbNames[mountHundredName] || (HundredSuburbNames[mountHundredName] = [])).push(suburbTokens[1].trim());  // several suburbs may exist for the same hundred name
-                mountHundredName = "Mt." + hundredName.substring("Mount ".length);
+                mountHundredName = "MT." + hundredName.substring("MOUNT ".length);
                 (HundredSuburbNames[mountHundredName] || (HundredSuburbNames[mountHundredName] = [])).push(suburbTokens[1].trim());  // several suburbs may exist for the same hundred name
-                mountHundredName = "Mt. " + hundredName.substring("Mount ".length);
+                mountHundredName = "MT. " + hundredName.substring("MOUNT ".length);
                 (HundredSuburbNames[mountHundredName] || (HundredSuburbNames[mountHundredName] = [])).push(suburbTokens[1].trim());  // several suburbs may exist for the same hundred name
             }
         }
