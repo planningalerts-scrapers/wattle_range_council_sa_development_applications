@@ -24,6 +24,8 @@ declare const process: any;
 
 // Address information.
 
+let StreetNames = null;
+let StreetSuffixes  = null;
 let SuburbNames = null;
 let HundredSuburbNames = null;
 
@@ -485,6 +487,26 @@ function sleep(milliseconds: number) {
 // Parses the development applications.
 
 async function main() {
+    // Read the street names.
+
+    StreetNames = {}
+    for (let line of fs.readFileSync("streetnames.txt").toString().replace(/\r/g, "").trim().split("\n")) {
+        let streetNameTokens = line.split(",");
+        let streetName = streetNameTokens[0].trim();
+        let suburbName = streetNameTokens[1].trim();
+        if (StreetNames[streetName] === undefined)
+            StreetNames[streetName] = [];
+        StreetNames[streetName].push(suburbName);  // several suburbs may exist for the same street name
+    }
+
+    // Read the street suffixes.
+
+    StreetSuffixes = {};
+    for (let line of fs.readFileSync("streetsuffixes.txt").toString().replace(/\r/g, "").trim().split("\n")) {
+        let streetSuffixTokens = line.split(",");
+        StreetSuffixes[streetSuffixTokens[0].trim().toLowerCase()] = streetSuffixTokens[1].trim();
+    }
+
     // Read the suburb names and hundred names.
 
     SuburbNames = {};
