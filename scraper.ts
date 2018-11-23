@@ -199,6 +199,10 @@ function formatStreet(text) {
 // Format the address, ensuring that it has a valid suburb, state and post code.
 
 function formatAddress(address) {
+    console.log(`Address: ${address}`);
+
+    address = address.replace(/ TCE NTH/g, " TERRACE NORTH").replace(/ TCE STH/g, " TERRACE SOUTH").replace(/ TCE EAST/g, " TERRACE EAST").replace(/ TCE WEST/g, " TERRACE WEST");
+
     // Handle the special case of a "ü" character in a string.  This means that the string actually
     // contains multiple addresses (so make a best effort to extract one of the addresses).  For
     // example,
@@ -243,22 +247,23 @@ function formatAddress(address) {
         }
     }
 
-    console.log(`hundredNameMatch1=${hundredNameMatch1}, hundredNameMatch2=${hundredNameMatch2}, suburbNameMatch1=${suburbNameMatch1}`);
+    if (suburbNameMatch1 !== null)
+        console.log(`    suburbNameMatch1: ${suburbNameMatch1}`);
     if (hundredNameMatch1 !== null)
-        console.log(`    1:${hundredNameMatch1}=${HundredSuburbNames[hundredNameMatch1].join(", ")}`);
+        console.log(`    hundredNameMatch1: ${hundredNameMatch1}=${HundredSuburbNames[hundredNameMatch1].join(", ")}`);
     if (hundredNameMatch2 !== null)
-        console.log(`    2:${hundredNameMatch2}=${HundredSuburbNames[hundredNameMatch2].join(", ")}`);
+        console.log(`    hundredNameMatch2: ${hundredNameMatch2}=${HundredSuburbNames[hundredNameMatch2].join(", ")}`);
 
-    let streetNameMatch1 = formatStreet(tokens[tokens.length - 1]);
     let streetNameMatch2 = formatStreet(tokens[tokens.length - 2]);
     let streetNameMatch3 = formatStreet(tokens[tokens.length - 3]);
+    let streetNameMatch4 = formatStreet(tokens[tokens.length - 4]);
 
-    if (streetNameMatch1 !== undefined)
-        console.log(`        streetNameMatch1=${streetNameMatch1.streetName}; ${streetNameMatch1.suburbNames}`);
     if (streetNameMatch2 !== undefined)
-        console.log(`        streetNameMatch2=${streetNameMatch2.streetName}; ${streetNameMatch2.suburbNames}`);
+        console.log(`    streetNameMatch2: ${streetNameMatch2.streetName}; ${streetNameMatch2.suburbNames}`);
     if (streetNameMatch3 !== undefined)
-        console.log(`        streetNameMatch3=${streetNameMatch3.streetName}; ${streetNameMatch3.suburbNames}`);
+        console.log(`    streetNameMatch3: ${streetNameMatch3.streetName}; ${streetNameMatch3.suburbNames}`);
+    if (streetNameMatch4 !== undefined)
+        console.log(`    streetNameMatch4: ${streetNameMatch4.streetName}; ${streetNameMatch4.suburbNames}`);
 
     return "";
 }
@@ -607,14 +612,14 @@ async function main() {
 
         for (let hundredName of suburbTokens[2].split(";")) {
             hundredName = hundredName.trim();
-            (HundredSuburbNames[hundredName] || (HundredSuburbNames[hundredName] = [])).push(suburbTokens[1].trim());  // several suburbs may exist for the same hundred name
+            (HundredSuburbNames[hundredName] || (HundredSuburbNames[hundredName] = [])).push(suburbName);  // several suburbs may exist for the same hundred name
             if (hundredName.startsWith("MOUNT ")) {
                 let mountHundredName = "MT " + hundredName.substring("MOUNT ".length);
-                (HundredSuburbNames[mountHundredName] || (HundredSuburbNames[mountHundredName] = [])).push(suburbTokens[1].trim());  // several suburbs may exist for the same hundred name
+                (HundredSuburbNames[mountHundredName] || (HundredSuburbNames[mountHundredName] = [])).push(suburbName);  // several suburbs may exist for the same hundred name
                 mountHundredName = "MT." + hundredName.substring("MOUNT ".length);
-                (HundredSuburbNames[mountHundredName] || (HundredSuburbNames[mountHundredName] = [])).push(suburbTokens[1].trim());  // several suburbs may exist for the same hundred name
+                (HundredSuburbNames[mountHundredName] || (HundredSuburbNames[mountHundredName] = [])).push(suburbName);  // several suburbs may exist for the same hundred name
                 mountHundredName = "MT. " + hundredName.substring("MOUNT ".length);
-                (HundredSuburbNames[mountHundredName] || (HundredSuburbNames[mountHundredName] = [])).push(suburbTokens[1].trim());  // several suburbs may exist for the same hundred name
+                (HundredSuburbNames[mountHundredName] || (HundredSuburbNames[mountHundredName] = [])).push(suburbName);  // several suburbs may exist for the same hundred name
             }
         }
     }
