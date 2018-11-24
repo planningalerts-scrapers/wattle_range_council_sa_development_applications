@@ -631,12 +631,12 @@ async function parsePdf(url: string) {
         console.log(`Reading and parsing applications from page ${pageIndex + 1} of ${pdf.numPages}.`);
         let page = await pdf.getPage(pageIndex + 1);
 
-        // Constructs cells (ie. rectangles) based on the horizontal and vertical line segments
+        // Construct cells (ie. rectangles) based on the horizontal and vertical line segments
         // in the PDF page.
 
         let cells = await parseCells(page);
 
-        // Constructs elements based on the text in the PDF page.
+        // Construct elements based on the text in the PDF page.
 
         let elements = await parseElements(page);
 
@@ -720,16 +720,13 @@ async function parsePdf(url: string) {
             let address = rowAddressCell.elements.map(element => element.text).join("").replace(/\s\s+/g, " ").trim();
             let description = (rowDescriptionCell === undefined) ? "" : rowDescriptionCell.elements.map(element => element.text).join("").replace(/\s\s+/g, " ").trim();
 
-            if (!/[0-9]+\/[0-9]+\/[0-9]/.test(applicationNumber))
+            if (!/[0-9]+\/[0-9]+\/[0-9]/.test(applicationNumber))  // an application number must be present
                 continue;
 
             address = formatAddress(address);
-            if (address === "")
+            if (address === "")  // an address must be present
                 continue;
 
-            if (description === "")
-                description = "NO DESCRIPTION PROVIDED";
-            
             developmentApplications.push({
                 applicationNumber: applicationNumber,
                 address: address,
