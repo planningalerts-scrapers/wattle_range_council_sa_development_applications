@@ -99,7 +99,7 @@ interface Cell extends Rectangle {
 
 // Constructs a rectangle based on the intersection of the two specified rectangles.
 
-function intersectRectangles(rectangle1: Rectangle, rectangle2: Rectangle): Rectangle {
+function intersect(rectangle1: Rectangle, rectangle2: Rectangle): Rectangle {
     let x1 = Math.max(rectangle1.x, rectangle2.x);
     let y1 = Math.max(rectangle1.y, rectangle2.y);
     let x2 = Math.min(rectangle1.x + rectangle1.width, rectangle2.x + rectangle2.width);
@@ -108,12 +108,6 @@ function intersectRectangles(rectangle1: Rectangle, rectangle2: Rectangle): Rect
         return { x: x1, y: y1, width: x2 - x1, height: y2 - y1 };
     else
         return { x: 0, y: 0, width: 0, height: 0 };
-}
-
-// Constructs an array of strings based on the intersection of the two specified arrays of strings.
-
-function intersectStrings(strings1: string[], strings2: string[]): string[] {
-    return (strings1 === undefined || strings2 === undefined) ? [] : strings1.filter(string1 => strings2.indexOf(string1) >= 0);
 }
 
 // Determines whether containerRectangle completely contains containedRectangle.
@@ -178,7 +172,8 @@ function formatStreet(text) {
 
     tokens.push(streetSuffix);
 
-    // Pop tokens from the end of the array until a valid street name is encountered.
+    // Extract tokens from the end of the array until a valid street name is encountered (this
+    // looks for an exact match).
 
     for (let index = 4; index >= 2; index--) {
         let suburbNames = StreetNames[tokens.slice(-index).join(" ")];
@@ -186,8 +181,8 @@ function formatStreet(text) {
             return { streetName: tokens.join(" "), suburbNames: suburbNames };  // reconstruct the street with the leading house number (and any other prefix text)
     }
 
-    // Pop tokens from the end of the array until a valid street name is encountered (allowing
-    // for a spelling error).
+    // Extract tokens from the end of the array until a valid street name is encountered (this
+    // allows for a spelling error).
 
     for (let index = 4; index >= 2; index--) {
         let streetNameMatch = didyoumean(tokens.slice(-index).join(" "), Object.keys(StreetNames), { caseSensitive: false, returnType: "first-closest-match", thresholdType: "edit-distance", threshold: 1, trimSpace: true });
@@ -208,9 +203,9 @@ function splitAddress(address) {
     if (!address.includes("ü"))
         return address;
 
-    // Handle the special case of a "ü" character in a string.  This means that the string actually
-    // contains multiple addresses (so make a best effort to extract one of the addresses).  For
-    // example,
+    // Handle the special case of a "ü" character in a string.  This means that the string
+    // actually contains multiple addresses (so make a best effort to extract one of the
+    // addresses).  For example,
     //
     //     5ü5A RALSTONüRALSTON STüST, PENOLAüPENOLA, PENOLA
     //
@@ -254,7 +249,7 @@ function splitAddress(address) {
     let address1 = address1Tokens.join(",")
     let address2 = address2Tokens.join(",")
 
-    // Choose the longer address (because it is the one more likely to have a street name).
+    // Choose the longer address (because it is the one most likely to have a street name).
 
     return (address1.length > address2.length) ? address1 : address2;
 }
@@ -276,14 +271,14 @@ function formatAddress(address) {
     // Find the location of the street name in the tokens.
 
     let streetNameIndex = 3;
-    let streetNameMatch = formatStreet(tokens[tokens.length - streetNameIndex]);  // the street name is most likely in the third to last token (so try this first)
-    if (streetNameMatch === undefined) {
+    let formattedStreet = formatStreet(tokens[tokens.length - streetNameIndex]);  // the street name is most likely in the third to last token (so try this first)
+    if (formattedStreet === undefined) {
         streetNameIndex = 2;
-        streetNameMatch = formatStreet(tokens[tokens.length - streetNameIndex]);  // try the second to last token (occasionally happens)
-        if (streetNameMatch === undefined) {
+        formattedStreet = formatStreet(tokens[tokens.length - streetNameIndex]);  // try the second to last token (occasionally happens)
+        if (formattedStreet === undefined) {
             streetNameIndex = 4;
-            streetNameMatch = formatStreet(tokens[tokens.length - streetNameIndex]);  // try the fourth to last token (rare)
-            if (streetNameMatch === undefined)
+            formattedStreet = formatStreet(tokens[tokens.length - streetNameIndex]);  // try the fourth to last token (rare)
+            if (formattedStreet === undefined)
                 return address;  // if a street name is not found then give up
         }
     }
@@ -299,9 +294,24 @@ function formatAddress(address) {
         let token = tokens[tokens.length - 1].trim();
         if (token.startsWith("HD "))
             token = token.substring("HD ".length).trim();
+
         let hundredNameMatch = didyoumean(token, Object.keys(HundredSuburbNames), { caseSensitive: false, returnType: "first-closest-match", thresholdType: "edit-distance", threshold: 2, trimSpace: true });
         if (hundredNameMatch !== null)
             hundredSuburbNames = HundredSuburbNames[hundredNameMatch];
+
+        // Construct the intersection of two arrays of suburb names (ignoring the array of suburb
+        // names derived from the hundred name if it is empty).
+
+        let intersectingSuburbNames = formattedStreet.suburbNames
+            .filter(suburbName => hundredSuburbNames === null || hundredSuburbNames.indexOf(suburbName) >= 0);
+        let suburbName = (intersectingSuburbNames.length === 0) ? formattedStreet.suburbNames[0] : intersectingSuburbNames[0];
+
+        // Reconstruct the full address using the formatted street name and determined suburb name.
+
+        tokens = tokens.slice(0, tokens.length - streetNameIndex);
+        tokens.push(formattedStreet.streetName);
+        tokens.push(SuburbNames[suburbName]);
+        return tokens.join(", ");
     }
 
     // If there are two tokens after the street name then assume that they are the suburb name
@@ -321,16 +331,16 @@ function formatAddress(address) {
 
     if (streetNameIndex === 3 || streetNameIndex === 4) {
         let hundredSuburbNames1 = [];
+        let hundredSuburbNames2 = [];
+        let suburbNames = [];
 
         let token = tokens[tokens.length - 1].trim();
         if (token.startsWith("HD "))
             token = token.substring("HD ".length).trim();
+
         let hundredNameMatch = didyoumean(token, Object.keys(HundredSuburbNames), { caseSensitive: false, returnType: "first-closest-match", thresholdType: "edit-distance", threshold: 2, trimSpace: true });
         if (hundredNameMatch !== null)
             hundredSuburbNames1 = HundredSuburbNames[hundredNameMatch];
-
-        let hundredSuburbNames2 = [];
-        let suburbNames = [];
 
         token = tokens[tokens.length - 2].trim();
         if (token.startsWith("HD ")) {
@@ -343,47 +353,25 @@ function formatAddress(address) {
             if (suburbNameMatch !== null)
                 suburbNames = [ suburbNameMatch ];
         }
+
+        // Construct the intersection of all the different arrays of suburb names (ignoring any
+        // arrays that are empty).
+
+        let intersectingSuburbNames = formattedStreet.suburbNames
+            .filter(suburbName => hundredSuburbNames1.length === 0 || hundredSuburbNames1.indexOf(suburbName) >= 0)
+            .filter(suburbName => hundredSuburbNames2.length === 0 || hundredSuburbNames2.indexOf(suburbName) >= 0)
+            .filter(suburbName => suburbNames.length === 0 || suburbNames.indexOf(suburbName) >= 0)
+        let suburbName = (intersectingSuburbNames.length === 0) ? formattedStreet.suburbNames[0] : intersectingSuburbNames[0];
+
+        // Reconstruct the full address using the formatted street name and determined suburb name.
+
+        tokens = tokens.slice(0, tokens.length - streetNameIndex);
+        tokens.push(formattedStreet.streetName);
+        tokens.push(SuburbNames[suburbName]);
+        return tokens.join(", ");
     }
 
-    let token = tokens[tokens.length - 1].trim();
-    if (token.startsWith("HD "))
-        token = token.substring("HD ".length);
-
-    let hundredNameMatch1 = didyoumean(token, Object.keys(HundredSuburbNames), { caseSensitive: false, returnType: "first-closest-match", thresholdType: "edit-distance", threshold: 2, trimSpace: true });
-    let hundredNameMatch2 = null;
-    let suburbNameMatch1 = null;
-
-    if (tokens.length >= 2) {
-        token = tokens[tokens.length - 2].trim();
-        if (token.startsWith("HD ")) {
-            token = token.substring("HD ".length);
-            hundredNameMatch2 = didyoumean(token, Object.keys(HundredSuburbNames), { caseSensitive: false, returnType: "first-closest-match", thresholdType: "edit-distance", threshold: 2, trimSpace: true });
-        } else {
-            suburbNameMatch1 = didyoumean(token, Object.keys(SuburbNames), { caseSensitive: false, returnType: "first-closest-match", thresholdType: "edit-distance", threshold: 2, trimSpace: true });
-        }
-    }
-
-    if (suburbNameMatch1 !== null)
-        console.log(`    suburbNameMatch1: ${suburbNameMatch1}`);
-    else
-        console.log(`    suburbNameMatch1: FALSE`);
-    if (hundredNameMatch1 !== null)
-        console.log(`    hundredNameMatch1: ${hundredNameMatch1}=${HundredSuburbNames[hundredNameMatch1].join(", ")}`);
-    if (hundredNameMatch2 !== null)
-        console.log(`    hundredNameMatch2: ${hundredNameMatch2}=${HundredSuburbNames[hundredNameMatch2].join(", ")}`);
-
-    // let streetNameMatch = formatStreet(tokens[tokens.length - 3]);  // the street name is most likely in the third to last token
-    // if (streetNameMatch === undefined)
-    //     streetNameMatch = formatStreet(tokens[tokens.length - 2]);
-    // if (streetNameMatch === undefined)
-    //     streetNameMatch = formatStreet(tokens[tokens.length - 4]);
-
-    if (streetNameMatch !== undefined)
-        console.log(`    streetNameMatch: ${streetNameMatch.streetName}; ${streetNameMatch.suburbNames}`);
-    else
-        console.log("** MISSING **");
-
-    return "";
+    return address;
 }
 
 // Parses a PDF document.
@@ -511,7 +499,7 @@ async function parsePdf(url: string) {
         // there are multiple cells then allocate the element to the left most cell.
 
         for (let element of elements) {
-            let ownerCell = cells.find(cell => getArea(intersectRectangles(cell, element)) > 0);  // this finds the left most cell due to the earlier sorting of cells
+            let ownerCell = cells.find(cell => getArea(intersect(cell, element)) > 0);  // this finds the left most cell due to the earlier sorting of cells
             if (ownerCell !== undefined)
                 ownerCell.elements.push(element);
         }
@@ -746,7 +734,7 @@ async function main() {
 
 console.log("Testing address formatting.");
 for (let address of fs.readFileSync("addresses.txt").toString().replace(/\r/g, "").trim().split("\n"))
-formatAddress(address);
+console.log(formatAddress(address));
 
     // Ensure that the database exists.
 
