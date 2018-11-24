@@ -45,7 +45,7 @@ async function initializeDatabase() {
 
 async function insertRow(database, developmentApplication) {
     return new Promise((resolve, reject) => {
-        let sqlStatement = database.prepare("insert or ignore into [data] values (?, ?, ?, ?, ?, ?, ?)");
+        let sqlStatement = database.prepare("insert or ignore into [data] values (?, ?, ?, ?, ?, ?)");
         sqlStatement.run([
             developmentApplication.applicationNumber,
             developmentApplication.address,
@@ -342,6 +342,9 @@ function formatAddress(address) {
         if (hundredNameMatch !== null)
             hundredSuburbNames1 = HundredSuburbNames[hundredNameMatch];
 
+        // The other token is usually a suburb name, but is sometimes a hundred name (as indicated
+        // by a "HD " prefix).
+        
         token = tokens[tokens.length - 2].trim();
         if (token.startsWith("HD ")) {
             token = token.substring("HD ".length).trim();
@@ -729,12 +732,6 @@ async function main() {
             }
         }
     }
-
-// Test address formatting.
-
-console.log("Testing address formatting.");
-for (let address of fs.readFileSync("addresses.txt").toString().replace(/\r/g, "").trim().split("\n"))
-console.log(formatAddress(address));
 
     // Ensure that the database exists.
 
