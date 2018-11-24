@@ -97,6 +97,57 @@ interface Cell extends Rectangle {
     elements: Element[]
 }
 
+// Reads all the address information into global objects.
+
+function readAddressInformation() {
+    // Read the street names.
+
+    StreetNames = {}
+    for (let line of fs.readFileSync("streetnames.txt").toString().replace(/\r/g, "").trim().split("\n")) {
+        let streetNameTokens = line.toUpperCase().split(",");
+        let streetName = streetNameTokens[0].trim();
+        let suburbName = streetNameTokens[1].trim();
+        (StreetNames[streetName] || (StreetNames[streetName] = [])).push(suburbName);  // several suburbs may exist for the same street name
+    }
+
+    // Read the street suffixes.
+
+    StreetSuffixes = {};
+    for (let line of fs.readFileSync("streetsuffixes.txt").toString().replace(/\r/g, "").trim().split("\n")) {
+        let streetSuffixTokens = line.toUpperCase().split(",");
+        StreetSuffixes[streetSuffixTokens[0].trim()] = streetSuffixTokens[1].trim();
+    }
+
+    // Read the suburb names and hundred names.
+
+    SuburbNames = {};
+    HundredSuburbNames = {};
+    for (let line of fs.readFileSync("suburbnames.txt").toString().replace(/\r/g, "").trim().split("\n")) {
+        let suburbTokens = line.toUpperCase().split(",");
+        
+        let suburbName = suburbTokens[0].trim();
+        SuburbNames[suburbName] = suburbTokens[1].trim();
+        if (suburbName.startsWith("MOUNT ")) {
+            SuburbNames["MT " + suburbName.substring("MOUNT ".length)] = suburbTokens[1].trim();
+            SuburbNames["MT." + suburbName.substring("MOUNT ".length)] = suburbTokens[1].trim();
+            SuburbNames["MT. " + suburbName.substring("MOUNT ".length)] = suburbTokens[1].trim();
+        }
+
+        for (let hundredName of suburbTokens[2].split(";")) {
+            hundredName = hundredName.trim();
+            (HundredSuburbNames[hundredName] || (HundredSuburbNames[hundredName] = [])).push(suburbName);  // several suburbs may exist for the same hundred name
+            if (hundredName.startsWith("MOUNT ")) {
+                let mountHundredName = "MT " + hundredName.substring("MOUNT ".length);
+                (HundredSuburbNames[mountHundredName] || (HundredSuburbNames[mountHundredName] = [])).push(suburbName);  // several suburbs may exist for the same hundred name
+                mountHundredName = "MT." + hundredName.substring("MOUNT ".length);
+                (HundredSuburbNames[mountHundredName] || (HundredSuburbNames[mountHundredName] = [])).push(suburbName);  // several suburbs may exist for the same hundred name
+                mountHundredName = "MT. " + hundredName.substring("MOUNT ".length);
+                (HundredSuburbNames[mountHundredName] || (HundredSuburbNames[mountHundredName] = [])).push(suburbName);  // several suburbs may exist for the same hundred name
+            }
+        }
+    }
+}
+
 // Constructs a rectangle based on the intersection of the two specified rectangles.
 
 function intersect(rectangle1: Rectangle, rectangle2: Rectangle): Rectangle {
@@ -344,7 +395,7 @@ function formatAddress(address) {
 
         // The other token is usually a suburb name, but is sometimes a hundred name (as indicated
         // by a "HD " prefix).
-        
+
         token = tokens[tokens.length - 2].trim();
         if (token.startsWith("HD ")) {
             token = token.substring("HD ".length).trim();
@@ -377,6 +428,192 @@ function formatAddress(address) {
     return address;
 }
 
+// Parses any elements that intersect more than one cell (and splits them into multiple elements).
+
+function removeOverhangingElements(rows: Cell[][], assessmentCell: Cell, descriptionCell: Cell, decisionDateCell: Cell) {
+    for (let row of rows) {
+        for (let columnIndex = 0; columnIndex < row.length; columnIndex++) {
+            let cell = row[columnIndex];
+
+            let overhangElements = cell.elements.filter(element => !contains(cell, element));
+            for (let overhangElement of overhangElements) {
+                // Find the companions (ie. roughly aligned with the same Y co-ordinate) of an
+                // element that intersects more than one cell.
+
+                let alignedElements: Element[] = [];
+                for (let index = cell.elements.length - 1; index >= 0; index--) {
+                    if (Math.abs(cell.elements[index].y - overhangElement.y) < 5) {  // elements with approximately the same Y co-ordinate
+                        alignedElements.unshift(cell.elements[index]);
+                        cell.elements.splice(index, 1); // remove the element
+                    }
+                }
+
+                // Join the aligned elements together and parse the resulting text.  Construct
+                // elements for the resulting text and add those elements to appropriate cells
+                // (these new elements effectively replace the old, removed elements).
+
+                let text = alignedElements.map(element => element.text).join("").trim();
+                if (text === "")
+                    continue;
+
+                if (getHorizontalOverlapPercentage(cell, assessmentCell) > 90) {
+                    // Parse the text into an assessment, a VG number and an application
+                    // number.
+
+                    let tokens = text.split("   ").map(token => token.trim()).filter(token => token !== "");
+                    let [assessmentText, vgNumberText, applicationNumberText] = tokens;
+                    cell.elements.push({ text: assessmentText, x: alignedElements[0].x, y: alignedElements[0].y, width: (cell.x + cell.width - alignedElements[0].x), height: alignedElements[0].height });
+                    if (columnIndex + 1 < row.length && vgNumberText !== undefined) {
+                        let vgNumberCell = row[columnIndex + 1];
+                        vgNumberCell.elements.push({ text: vgNumberText, x: vgNumberCell.x, y: alignedElements[0].y, width: vgNumberCell.width, height: alignedElements[0].height });
+                    }
+
+                    if (columnIndex + 2 < row.length && applicationNumberText !== undefined) {
+                        let applicationNumberCell = row[columnIndex + 2];
+                        applicationNumberCell.elements.push({ text: applicationNumberText, x: applicationNumberCell.x, y: alignedElements[0].y, width: applicationNumberCell.width, height: alignedElements[0].height });
+                    }
+                } else if (getHorizontalOverlapPercentage(cell, descriptionCell) > 90) {
+                    // Parse the text into a description and a decision date.
+
+                    let tokens = text.split("   ").map(token => token.trim()).filter(token => token !== "");
+                    let [descriptionText, decisionDateText] = tokens;
+                    cell.elements.push({ text: descriptionText, x: alignedElements[0].x, y: alignedElements[0].y, width: (cell.x + cell.width - alignedElements[0].x), height: alignedElements[0].height });
+                    if (columnIndex + 1 < row.length && decisionDateText !== undefined) {
+                        let decisionDateCell = row[columnIndex + 1];
+                        decisionDateCell.elements.push({ text: decisionDateText, x: decisionDateCell.x, y: alignedElements[0].y, width: decisionDateCell.width, height: alignedElements[0].height });
+                    }
+                } else if (getHorizontalOverlapPercentage(cell, decisionDateCell) > 90) {
+                    // Parse the text into a decision date.
+
+                    let tokens = text.split("   ").map(token => token.trim()).filter(token => token !== "");
+                    let [decisionDateText] = tokens;
+                    cell.elements.push({ text: decisionDateText, x: alignedElements[0].x, y: alignedElements[0].y, width: (cell.x + cell.width - alignedElements[0].x), height: alignedElements[0].height });
+                }
+            }
+        }
+    }
+
+    // Re-sort the elements in each cell (now that elements have been re-constructed and then
+    // added to different cells).
+
+    let elementComparer = (a, b) => (Math.abs(a.y - b.y) < 1) ? ((a.x > b.x) ? 1 : ((a.x < b.x) ? -1 : 0)) : ((a.y > b.y) ? 1 : -1);
+    for (let row of rows)
+        for (let cell of row)
+            cell.elements.sort(elementComparer);
+}
+
+// Examines all the lines in a page of a PDF and constructs cells (ie. rectangles) based on those
+// lines.
+
+async function parseCells(page) {
+    let operators = await page.getOperatorList();
+
+    // Find the lines.  Each line is actually constructed using a rectangle with a very short
+    // height or a very narrow width.
+
+    let lines: Rectangle[] = [];
+
+    for (let index = 0; index < operators.fnArray.length; index++) {
+        if (operators.fnArray[index] !== pdfjs.OPS.constructPath)
+            continue;
+            
+        let x = operators.argsArray[index][1][1];
+        let y = operators.argsArray[index][1][0];
+        let width = operators.argsArray[index][1][3];
+        let height = operators.argsArray[index][1][2];
+
+        lines.push({x: x, y: y, width: width, height: height});
+    }
+
+    // Convert the lines into a grid of points.
+
+    let points: Point[] = [];
+
+    for (let line of lines) {
+        // Ignore thick lines (since these are probably intented to be drawn as rectangles).
+        // And ignore short lines (because these are probably of no consequence).
+
+        if ((line.width > 2 && line.height > 2) || (line.width <= 2 && line.height < 10) || (line.height <= 2 && line.width < 10))
+            continue;
+
+        let startPoint: Point = { x: line.x, y: line.y };
+        if (!points.some(point => (startPoint.x - point.x) ** 2 + (startPoint.y - point.y) ** 2 < 1))
+            points.push(startPoint);
+
+        let endPoint: Point = undefined;
+        if (line.height <= 2)  // horizontal line
+            endPoint = { x: line.x + line.width, y: line.y };
+        else  // vertical line
+            endPoint = { x: line.x, y: line.y + line.height };
+
+        if (!points.some(point => (endPoint.x - point.x) ** 2 + (endPoint.y - point.y) ** 2 < 1))
+            points.push(endPoint);
+    }
+
+    // Construct cells based on the grid of points.
+
+    let cells: Cell[] = [];
+    for (let point of points) {
+        // Find the next closest point in the X direction (moving across horizontally with
+        // approximately the same Y co-ordinate).
+
+        let closestRightPoint = points.reduce(
+            ((previous, current) => (Math.abs(current.y - point.y) < 1 && current.x > point.x && (previous === undefined || (current.x - point.x < previous.x - point.x))) ? current : previous),
+            undefined);
+
+        // Find the next closest point in the Y direction (moving down vertically with
+        // approximately the same X co-ordinate).
+
+        let closestDownPoint = points.reduce(
+            ((previous, current) => (Math.abs(current.x - point.x) < 1 && current.y > point.y && (previous === undefined || (current.y - point.y < previous.y - point.y))) ? current : previous),
+            undefined);
+
+        // Construct a rectangle from the found points.
+
+        if (closestRightPoint !== undefined && closestDownPoint !== undefined)
+            cells.push({ elements: [], x: point.x, y: point.y, width: closestRightPoint.x - point.x, height: closestDownPoint.y - point.y });
+    }
+
+    // Sort the cells by approximate Y co-ordinate and then by X co-ordinate.
+
+    let cellComparer = (a, b) => (Math.abs(a.y - b.y) < 2) ? ((a.x > b.x) ? 1 : ((a.x < b.x) ? -1 : 0)) : ((a.y > b.y) ? 1 : -1);
+    cells.sort(cellComparer);
+    return cells;
+}
+
+// Parses the text elements from a page of a PDF.
+
+async function parseElements(page) {
+    let viewport = await page.getViewport(1.0);
+    let textContent = await page.getTextContent();
+
+    // Find all the text elements.
+
+    let elements: Element[] = textContent.items.map(item => {
+        let transform = pdfjs.Util.transform(viewport.transform, item.transform);
+
+        // Work around the issue https://github.com/mozilla/pdf.js/issues/8276 (heights are
+        // exaggerated).  The problem seems to be that the height value is too large in some
+        // PDFs.  Provide an alternative, more accurate height value by using a calculation
+        // based on the transform matrix.
+
+        let workaroundHeight = Math.sqrt(transform[2] * transform[2] + transform[3] * transform[3]);
+
+        let x = transform[4];
+        let y = transform[5] - workaroundHeight;
+        let width = item.width;
+        let height = workaroundHeight;
+
+        return { text: item.str, x: x, y: y, width: width, height: height };
+    });
+
+    // Sort the text elements by approximate Y co-ordinate and then by X co-ordinate.
+
+    let elementComparer = (a, b) => (Math.abs(a.y - b.y) < 1) ? ((a.x > b.x) ? 1 : ((a.x < b.x) ? -1 : 0)) : ((a.y > b.y) ? 1 : -1);
+    elements.sort(elementComparer);
+    return elements;
+}
+
 // Parses a PDF document.
 
 async function parsePdf(url: string) {
@@ -394,107 +631,14 @@ async function parsePdf(url: string) {
         console.log(`Reading and parsing applications from page ${pageIndex + 1} of ${pdf.numPages}.`);
         let page = await pdf.getPage(pageIndex + 1);
 
-        // Construct a text element for each item from the parsed PDF information.
+        // Constructs cells (ie. rectangles) based on the horizontal and vertical line segments
+        // in the PDF page.
 
-        let viewport = await page.getViewport(1.0);
-        let textContent = await page.getTextContent();
-        let operators = await page.getOperatorList();
+        let cells = await parseCells(page);
 
-        // Find the lines.  Each line is actually constructed using a rectangle with a very short
-        // height or a very narrow width.
+        // Constructs elements based on the text in the PDF page.
 
-        let lines: Rectangle[] = [];
-
-        for (let index = 0; index < operators.fnArray.length; index++) {
-            if (operators.fnArray[index] !== pdfjs.OPS.constructPath)
-                continue;
-                
-            let x = operators.argsArray[index][1][1];
-            let y = operators.argsArray[index][1][0];
-            let width = operators.argsArray[index][1][3];
-            let height = operators.argsArray[index][1][2];
-
-            lines.push({x: x, y: y, width: width, height: height});
-        }
-
-        // Convert the lines into a grid of points.
-
-        let points: Point[] = [];
-
-        for (let line of lines) {
-            // Ignore thick lines (since these are probably intented to be drawn as rectangles).
-            // And ignore short lines (because these are probably of no consequence).
-
-            if ((line.width > 2 && line.height > 2) || (line.width <= 2 && line.height < 10) || (line.height <= 2 && line.width < 10))
-                continue;
-
-            let startPoint: Point = { x: line.x, y: line.y };
-            if (!points.some(point => (startPoint.x - point.x) ** 2 + (startPoint.y - point.y) ** 2 < 1))
-                points.push(startPoint);
-
-            let endPoint: Point = undefined;
-            if (line.height <= 2)  // horizontal line
-                endPoint = { x: line.x + line.width, y: line.y };
-            else  // vertical line
-                endPoint = { x: line.x, y: line.y + line.height };
-
-            if (!points.some(point => (endPoint.x - point.x) ** 2 + (endPoint.y - point.y) ** 2 < 1))
-                points.push(endPoint);
-        }
-
-        // Construct cells based on the grid of points.
-
-        let cells: Cell[] = [];
-        for (let point of points) {
-            // Find the next closest point in the X direction (moving across horizontally with
-            // approximately the same Y co-ordinate).
-
-            let closestRightPoint = points.reduce(
-                ((previous, current) => (Math.abs(current.y - point.y) < 1 && current.x > point.x && (previous === undefined || (current.x - point.x < previous.x - point.x))) ? current : previous),
-                undefined);
-
-            // Find the next closest point in the Y direction (moving down vertically with
-            // approximately the same X co-ordinate).
-
-            let closestDownPoint = points.reduce(
-                ((previous, current) => (Math.abs(current.x - point.x) < 1 && current.y > point.y && (previous === undefined || (current.y - point.y < previous.y - point.y))) ? current : previous),
-                undefined);
-
-            // Construct a rectangle from the found points.
-
-            if (closestRightPoint !== undefined && closestDownPoint !== undefined)
-                cells.push({ elements: [], x: point.x, y: point.y, width: closestRightPoint.x - point.x, height: closestDownPoint.y - point.y });
-        }
-
-        // Sort the cells by approximate Y co-ordinate and then by X co-ordinate.
-
-        let cellComparer = (a, b) => (Math.abs(a.y - b.y) < 2) ? ((a.x > b.x) ? 1 : ((a.x < b.x) ? -1 : 0)) : ((a.y > b.y) ? 1 : -1);
-        cells.sort(cellComparer);
-
-        // Find all the text elements.
-
-        let elements: Element[] = textContent.items.map(item => {
-            let transform = pdfjs.Util.transform(viewport.transform, item.transform);
-
-            // Work around the issue https://github.com/mozilla/pdf.js/issues/8276 (heights are
-            // exaggerated).  The problem seems to be that the height value is too large in some
-            // PDFs.  Provide an alternative, more accurate height value by using a calculation
-            // based on the transform matrix.
-
-            let workaroundHeight = Math.sqrt(transform[2] * transform[2] + transform[3] * transform[3]);
-
-            let x = transform[4];
-            let y = transform[5] - workaroundHeight;
-            let width = item.width;
-            let height = workaroundHeight;
-
-            return { text: item.str, x: x, y: y, width: width, height: height };
-        });
-
-        // Sort the text elements by approximate Y co-ordinate and then by X co-ordinate.
-
-        let elementComparer = (a, b) => (Math.abs(a.y - b.y) < 1) ? ((a.x > b.x) ? 1 : ((a.x < b.x) ? -1 : 0)) : ((a.y > b.y) ? 1 : -1);
-        elements.sort(elementComparer);
+        let elements = await parseElements(page);
 
         // Allocate each element to an "owning" cell.  An element may extend across several
         // cells (because the PDF parsing may join together multiple sections of text, using
@@ -529,7 +673,7 @@ async function parsePdf(url: string) {
 
         // Ensure the rows are sorted by Y co-ordinate and that the cells in each row are sorted
         // by X co-ordinate (this is really just a safety precaution because the earlier sorting
-        // of cells should have already ensured this).
+        // of cells in the parseCells function should have already ensured this).
 
         let rowComparer = (a, b) => (a[0].y > b[0].y) ? 1 : ((a[0].y < b[0].y) ? -1 : 0);
         rows.sort(rowComparer);
@@ -559,75 +703,10 @@ async function parsePdf(url: string) {
         }
 
         // Parse any elements that intersect more than one cell (and split them into multiple
-        // elements).
+        // elements).  This also ensures the elements in each cell are appropriately sorted by
+        // approximate Y co-ordinate and then by X co-ordinate.
 
-        for (let row of rows) {
-            for (let columnIndex = 0; columnIndex < row.length; columnIndex++) {
-                let cell = row[columnIndex];
-
-                let overhangElements = cell.elements.filter(element => !contains(cell, element));
-                for (let overhangElement of overhangElements) {
-                    // Find the companions (ie. roughly aligned with the same Y co-ordinate) of an
-                    // element that intersects more than one cell.
-
-                    let alignedElements: Element[] = [];
-                    for (let index = cell.elements.length - 1; index >= 0; index--) {
-                        if (Math.abs(cell.elements[index].y - overhangElement.y) < 5) {  // elements with approximately the same Y co-ordinate
-                            alignedElements.unshift(cell.elements[index]);
-                            cell.elements.splice(index, 1);  // remove the element
-                        }
-                    }
-
-                    // Join the aligned elements together and parse the resulting text.  Construct
-                    // elements for the resulting text and add those elements to appropriate cells
-                    // (these new elements effectively replace the old, removed elements).
-
-                    let text = alignedElements.map(element => element.text).join("").trim();
-                    if (text === "")
-                        continue;
-
-                    if (getHorizontalOverlapPercentage(cell, assessmentCell) > 90) {
-                        // Parse the text into an assessment, a VG number and an application
-                        // number.
-
-                        let tokens = text.split("   ").map(token => token.trim()).filter(token => token !== "");
-                        let [ assessmentText, vgNumberText, applicationNumberText] = tokens;
-                        cell.elements.push({ text: assessmentText, x: alignedElements[0].x, y: alignedElements[0].y, width: (cell.x + cell.width - alignedElements[0].x), height: alignedElements[0].height });
-                        if (columnIndex + 1 < row.length && vgNumberText !== undefined) {
-                            let vgNumberCell = row[columnIndex + 1];
-                            vgNumberCell.elements.push({ text: vgNumberText, x: vgNumberCell.x, y: alignedElements[0].y, width: vgNumberCell.width, height: alignedElements[0].height });
-                        }
-                        if (columnIndex + 2 < row.length && applicationNumberText !== undefined) {
-                            let applicationNumberCell = row[columnIndex + 2];
-                            applicationNumberCell.elements.push({ text: applicationNumberText, x: applicationNumberCell.x, y: alignedElements[0].y, width: applicationNumberCell.width, height: alignedElements[0].height });
-                        }
-                    } else if (getHorizontalOverlapPercentage(cell, descriptionCell) > 90) {
-                        // Parse the text into a description and a decision date.
-
-                        let tokens = text.split("   ").map(token => token.trim()).filter(token => token !== "");
-                        let [ descriptionText, decisionDateText ] = tokens;
-                        cell.elements.push({ text: descriptionText, x: alignedElements[0].x, y: alignedElements[0].y, width: (cell.x + cell.width - alignedElements[0].x), height: alignedElements[0].height });
-                        if (columnIndex + 1 < row.length && decisionDateText !== undefined) {
-                            let decisionDateCell = row[columnIndex + 1];
-                            decisionDateCell.elements.push({ text: decisionDateText, x: decisionDateCell.x, y: alignedElements[0].y, width: decisionDateCell.width, height: alignedElements[0].height });
-                        }
-                    } else if (getHorizontalOverlapPercentage(cell, decisionDateCell) > 90) {
-                        // Parse the text into a decision date.
-
-                        let tokens = text.split("   ").map(token => token.trim()).filter(token => token !== "");
-                        let [ decisionDateText ] = tokens;
-                        cell.elements.push({ text: decisionDateText, x: alignedElements[0].x, y: alignedElements[0].y, width: (cell.x + cell.width - alignedElements[0].x), height: alignedElements[0].height });
-                    }
-                }
-            }
-        }
-
-        // Re-sort the elements in each cell (now that elements have been re-constructed and then
-        // added to different cells).
-
-        for (let row of rows)
-            for (let cell of row)
-                cell.elements.sort(elementComparer);
+        removeOverhangingElements(rows, assessmentCell, descriptionCell, decisionDateCell);
 
         // Try to extract a development application from each row (some rows, such as the heading
         // row, will not actually contain a development application).
@@ -636,12 +715,10 @@ async function parsePdf(url: string) {
             let rowApplicationNumberCell = row.find(cell => getHorizontalOverlapPercentage(cell, applicationNumberCell) > 90);
             let rowAddressCell = row.find(cell => getHorizontalOverlapPercentage(cell, addressCell) > 90);
             let rowDescriptionCell = row.find(cell => getHorizontalOverlapPercentage(cell, descriptionCell) > 90);
-            let rowDecisionDateCell = row.find(cell => getHorizontalOverlapPercentage(cell, decisionDateCell) > 90);
 
             let applicationNumber = rowApplicationNumberCell.elements.map(element => element.text).join("").trim();
             let address = rowAddressCell.elements.map(element => element.text).join("").replace(/\s\s+/g, " ").trim();
             let description = (rowDescriptionCell === undefined) ? "" : rowDescriptionCell.elements.map(element => element.text).join("").replace(/\s\s+/g, " ").trim();
-            let decisionDateText = (rowDecisionDateCell === undefined) ? "" : rowDecisionDateCell.elements.map(element => element.text).join("").trim();
 
             if (!/[0-9]+\/[0-9]+\/[0-9]/.test(applicationNumber))
                 continue;
@@ -653,10 +730,6 @@ async function parsePdf(url: string) {
             if (description === "")
                 description = "NO DESCRIPTION PROVIDED";
             
-            let decisionDate = moment(decisionDateText.replace(/\./g, "/"), "D/MM/YYYY", true);
-
-            console.log(`applicationNumber=[${applicationNumber}] address=[${address}] description=[${description}] decisionDate=[${decisionDate}]`);
-
             developmentApplications.push({
                 applicationNumber: applicationNumber,
                 address: address,
@@ -686,56 +759,13 @@ function sleep(milliseconds: number) {
 // Parses the development applications.
 
 async function main() {
-    // Read the street names.
-
-    StreetNames = {}
-    for (let line of fs.readFileSync("streetnames.txt").toString().replace(/\r/g, "").trim().split("\n")) {
-        let streetNameTokens = line.toUpperCase().split(",");
-        let streetName = streetNameTokens[0].trim();
-        let suburbName = streetNameTokens[1].trim();
-        (StreetNames[streetName] || (StreetNames[streetName] = [])).push(suburbName);  // several suburbs may exist for the same street name
-    }
-
-    // Read the street suffixes.
-
-    StreetSuffixes = {};
-    for (let line of fs.readFileSync("streetsuffixes.txt").toString().replace(/\r/g, "").trim().split("\n")) {
-        let streetSuffixTokens = line.toUpperCase().split(",");
-        StreetSuffixes[streetSuffixTokens[0].trim()] = streetSuffixTokens[1].trim();
-    }
-
-    // Read the suburb names and hundred names.
-
-    SuburbNames = {};
-    HundredSuburbNames = {};
-    for (let line of fs.readFileSync("suburbnames.txt").toString().replace(/\r/g, "").trim().split("\n")) {
-        let suburbTokens = line.toUpperCase().split(",");
-        
-        let suburbName = suburbTokens[0].trim();
-        SuburbNames[suburbName] = suburbTokens[1].trim();
-        if (suburbName.startsWith("MOUNT ")) {
-            SuburbNames["MT " + suburbName.substring("MOUNT ".length)] = suburbTokens[1].trim();
-            SuburbNames["MT." + suburbName.substring("MOUNT ".length)] = suburbTokens[1].trim();
-            SuburbNames["MT. " + suburbName.substring("MOUNT ".length)] = suburbTokens[1].trim();
-        }
-
-        for (let hundredName of suburbTokens[2].split(";")) {
-            hundredName = hundredName.trim();
-            (HundredSuburbNames[hundredName] || (HundredSuburbNames[hundredName] = [])).push(suburbName);  // several suburbs may exist for the same hundred name
-            if (hundredName.startsWith("MOUNT ")) {
-                let mountHundredName = "MT " + hundredName.substring("MOUNT ".length);
-                (HundredSuburbNames[mountHundredName] || (HundredSuburbNames[mountHundredName] = [])).push(suburbName);  // several suburbs may exist for the same hundred name
-                mountHundredName = "MT." + hundredName.substring("MOUNT ".length);
-                (HundredSuburbNames[mountHundredName] || (HundredSuburbNames[mountHundredName] = [])).push(suburbName);  // several suburbs may exist for the same hundred name
-                mountHundredName = "MT. " + hundredName.substring("MOUNT ".length);
-                (HundredSuburbNames[mountHundredName] || (HundredSuburbNames[mountHundredName] = [])).push(suburbName);  // several suburbs may exist for the same hundred name
-            }
-        }
-    }
-
     // Ensure that the database exists.
 
     let database = await initializeDatabase();
+
+    // Read all street, street suffix, suburb and hundred information.
+
+    readAddressInformation();
 
     // Retrieve the page that contains the links to the PDFs.
 
@@ -763,17 +793,12 @@ async function main() {
     // at once because this may use too much memory, resulting in morph.io terminating the current
     // process).
 
-let selectedPdfUrls = pdfUrls;
-
-    // let selectedPdfUrls: string[] = [];
-    // selectedPdfUrls.push(pdfUrls.shift());
-    // if (pdfUrls.length > 0)
-    //     selectedPdfUrls.push(pdfUrls[getRandom(1, pdfUrls.length)]);
-    // if (getRandom(0, 2) === 0)
-    //     selectedPdfUrls.reverse();
-
-// console.log("Testing PDF.");
-// selectedPdfUrls = [ "https://www.wattlerange.sa.gov.au/webdata/resources/files/Stats%20May%2015.pdf" ];
+    let selectedPdfUrls: string[] = [];
+    selectedPdfUrls.push(pdfUrls.shift());
+    if (pdfUrls.length > 0)
+        selectedPdfUrls.push(pdfUrls[getRandom(1, pdfUrls.length)]);
+    if (getRandom(0, 2) === 0)
+        selectedPdfUrls.reverse();
 
     for (let pdfUrl of selectedPdfUrls) {
         console.log(`Parsing document: ${pdfUrl}`);
