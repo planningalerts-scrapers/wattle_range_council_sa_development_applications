@@ -600,8 +600,7 @@ async function parseElements(page) {
     // Find all the text elements.
 
     let elements: Element[] = textContent.items.map(item => {
-//        let transform = pdfjs.Util.transform(viewport.transform, item.transform);
-        let transform = item.transform;
+        let transform = pdfjs.Util.transform(viewport.transform, item.transform);
 
         // Work around the issue https://github.com/mozilla/pdf.js/issues/8276 (heights are
         // exaggerated).  The problem seems to be that the height value is too large in some
@@ -654,14 +653,14 @@ async function parsePdf(url: string) {
         if (page.rotate !== 0)  // degrees
             console.log(`Page is rotated ${page.rotate}°.`);
 
-        if (page.rotate === 90) {  // degrees
-            for (let cell of cells)
-                rotate90Clockwise(cell);
+//        if (page.rotate === 90) {  // degrees
+//            for (let cell of cells)
+//                rotate90Clockwise(cell);
             for (let element of elements) {
                 rotate90Clockwise(element);
                 [ element.y, element.width, element.height ] = [ element.y - element.width, element.height, element.width ];  // artificial adjustment (based on experimentation)
             }
-        }
+//        }
 for (let cell of cells)
     console.log(`DrawRectangle(e.Graphics, ${cell.x}f, ${cell.y}f, ${cell.width}f, ${cell.height}f);`);
 for (let element of elements)
