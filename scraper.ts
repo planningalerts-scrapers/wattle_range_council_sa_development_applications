@@ -600,7 +600,8 @@ async function parseElements(page) {
     // Find all the text elements.
 
     let elements: Element[] = textContent.items.map(item => {
-        let transform = pdfjs.Util.transform(viewport.transform, item.transform);
+//        let transform = pdfjs.Util.transform(viewport.transform, item.transform);
+        let transform = item.transform;
 
         // Work around the issue https://github.com/mozilla/pdf.js/issues/8276 (heights are
         // exaggerated).  The problem seems to be that the height value is too large in some
