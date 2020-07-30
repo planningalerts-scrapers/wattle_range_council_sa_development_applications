@@ -195,6 +195,19 @@ function getHorizontalOverlapPercentage(rectangle1: Rectangle, rectangle2: Recta
     return (intersectionWidth * 100) / unionWidth;
 }
 
+// Rotates a rectangle 90 degrees clockwise about the origin.
+
+function rotate90Clockwise(rectangle: Rectangle) {
+    let x = -(rectangle.y + rectangle.height);
+    let y = rectangle.x;
+    let width = rectangle.height;
+    let height = rectangle.width;
+    rectangle.x = x;
+    rectangle.y = y;
+    rectangle.width = width;
+    rectangle.height = height;
+}
+
 // Formats the text as a street.  If the text is not recognised as a street then undefined is
 // returned.
 
@@ -637,6 +650,17 @@ async function parsePdf(url: string) {
 
         let elements = await parseElements(page);
 
+        if (page.rotate !== 0)  // degrees
+            console.log(`Page is rotated ${page.rotate}°.`);
+
+        if (page.rotate === 90) {  // degrees
+            for (let cell of cells)
+                rotate90Clockwise(cell);
+            for (let element of elements) {
+                rotate90Clockwise(element);
+                [ element.y, element.width, element.height ] = [ element.y - element.width, element.height, element.width ];  // artificial adjustment (based on experimentation)
+            }
+        }
 for (let cell of cells)
     console.log(`DrawRectangle(e.Graphics, ${cell.x}f, ${cell.y}f, ${cell.width}f, ${cell.height}f);`);
 for (let element of elements)
