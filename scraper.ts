@@ -681,6 +681,12 @@ async function parsePdf(url: string) {
 
         // Find the heading cells.
 
+for (let cell of cells) {
+    console.log(`    cell: ${cell.x}, ${cell.y}, ${cell.width}, ${cell.height}`);
+    for (let element of cell.elements)
+        console.log(`        ${element.text}`);
+}
+    
         let assessmentCell = cells.find(cell => cell.elements.some(element => element.text.trim() === "ASSESS" && contains(cell, element)));
         let applicationNumberCell = cells.find(cell => cell.elements.some(element => element.text.trim() === "DA NUMBER" && contains(cell, element)));
         let addressCell = cells.find(cell => cell.elements.some(element => element.text.trim() === "LOCATION" && contains(cell, element)));
@@ -793,6 +799,9 @@ async function main() {
         selectedPdfUrls.push(pdfUrls[getRandom(0, pdfUrls.length)]);
     if (getRandom(0, 2) === 0)
         selectedPdfUrls.reverse();
+
+console.log("Forcing one PDF.");
+selectedPdfUrls = [ "https://www.wattlerange.sa.gov.au/__data/assets/pdf_file/0026/719207/Stats-June-2020.pdf" ];
 
     for (let pdfUrl of selectedPdfUrls) {
         console.log(`Parsing document: ${pdfUrl}`);
