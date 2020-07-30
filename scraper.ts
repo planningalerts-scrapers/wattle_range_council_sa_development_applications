@@ -682,9 +682,9 @@ async function parsePdf(url: string) {
         // Find the heading cells.
 
 for (let cell of cells) {
-    console.log(`    cell: ${cell.x}, ${cell.y}, ${cell.width}, ${cell.height}`);
+    console.log(`    cell [ ${cell.x}, ${cell.y}, ${cell.width}, ${cell.height}]`);
     for (let element of cell.elements)
-        console.log(`        ${element.text}`);
+        console.log(`        [${element.text}][${contains(cell, element)}][${element.x}, ${element.y}, ${element.width}, ${element.height}]`);
 }
     
         let assessmentCell = cells.find(cell => cell.elements.some(element => element.text.trim() === "ASSESS" && contains(cell, element)));
