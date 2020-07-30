@@ -597,9 +597,7 @@ async function parseElements(page) {
         let workaroundHeight = Math.sqrt(transform[2] * transform[2] + transform[3] * transform[3]);
 
         let x = transform[4];
-//////////// TRY WITHOUT subtraction        
-//        let y = transform[5] - workaroundHeight;
-        let y = transform[5];
+        let y = transform[5] - workaroundHeight;
         let width = item.width;
         let height = workaroundHeight;
 
@@ -638,6 +636,11 @@ async function parsePdf(url: string) {
         // Construct elements based on the text in the PDF page.
 
         let elements = await parseElements(page);
+
+for (let cell of cells)
+    console.log(`DrawRectangle(e.Graphics, ${cell.x}f, ${cell.y}f, ${cell.width}f, ${cell.height}f);`);
+for (let element of elements)
+    console.log(`DrawText(e.Graphics, "${element.text.replace(/\"/g, "\"\"")}", ${element.x}f, ${element.y}f, ${element.width}f, ${element.height}f);`);
 
         // Allocate each element to an "owning" cell.  An element may extend across several
         // cells (because the PDF parsing may join together multiple sections of text, using
