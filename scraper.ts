@@ -597,7 +597,9 @@ async function parseElements(page) {
         let workaroundHeight = Math.sqrt(transform[2] * transform[2] + transform[3] * transform[3]);
 
         let x = transform[4];
-        let y = transform[5] - workaroundHeight;
+//////////// TRY WITHOUT subtraction        
+//        let y = transform[5] - workaroundHeight;
+        let y = transform[5];
         let width = item.width;
         let height = workaroundHeight;
 
