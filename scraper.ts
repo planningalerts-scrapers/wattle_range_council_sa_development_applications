@@ -653,13 +653,13 @@ async function parsePdf(url: string) {
         if (page.rotate !== 0)  // degrees
             console.log(`Page is rotated ${page.rotate}°.`);
 
-//        if (page.rotate === 90) {  // degrees
-            for (let cell of cells)
-                rotate90Clockwise(cell);
-            for (let element of elements) {
-                // rotate90Clockwise(element);
-                [ element.y, element.width, element.height ] = [ element.y - element.width, element.height, element.width ];  // artificial adjustment (based on experimentation)
-            }
+// //        if (page.rotate === 90) {  // degrees
+//             for (let cell of cells)
+//                 rotate90Clockwise(cell);
+//             for (let element of elements) {
+//                 rotate90Clockwise(element);
+                // [ element.y, element.width, element.height ] = [ element.y - element.width, element.height, element.width ];  // artificial adjustment (based on experimentation)
+//            }
 //        }
 
 for (let cell of cells)
