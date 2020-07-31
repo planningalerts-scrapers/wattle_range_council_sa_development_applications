@@ -666,10 +666,12 @@ async function parsePdf(url: string) {
         if (page.rotate !== 0)  // degrees
             console.log(`Page is rotated ${page.rotate}°.`);
 
+        let viewport = await page.getViewport(1.0);
+
 // //        if (page.rotate === 90) {  // degrees
              for (let cell of cells) {
                  rotate90AntiClockwise(cell);
-                 cell.y = cell.y + page.height;
+                 cell.y = cell.y + viewport.height;
              }
 //             for (let element of elements) {
 //                 rotate90Clockwise(element);
