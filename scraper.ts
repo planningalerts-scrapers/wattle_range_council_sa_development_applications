@@ -657,7 +657,7 @@ async function parsePdf(url: string) {
 //            for (let cell of cells)
 //                rotate90Clockwise(cell);
             for (let element of elements) {
-                rotate90Clockwise(element);
+                // rotate90Clockwise(element);
                 [ element.y, element.width, element.height ] = [ element.y - element.width, element.height, element.width ];  // artificial adjustment (based on experimentation)
             }
 //        }
