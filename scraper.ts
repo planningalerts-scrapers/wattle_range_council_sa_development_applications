@@ -658,9 +658,10 @@ async function parsePdf(url: string) {
 //                rotate90Clockwise(cell);
             for (let element of elements) {
                 rotate90Clockwise(element);
-                // [ element.y, element.width, element.height ] = [ element.y - element.width, element.height, element.width ];  // artificial adjustment (based on experimentation)
+                [ element.y, element.width, element.height ] = [ element.y - element.width, element.height, element.width ];  // artificial adjustment (based on experimentation)
             }
 //        }
+
 for (let cell of cells)
     console.log(`DrawRectangle(e.Graphics, ${cell.x}f, ${cell.y}f, ${cell.width}f, ${cell.height}f);`);
 for (let element of elements)
