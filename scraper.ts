@@ -679,10 +679,10 @@ async function parsePdf(url: string) {
 //            }
 //        }
 
-for (let cell of cells)
-    console.log(`DrawRectangle(e.Graphics, ${cell.x}f, ${cell.y}f, ${cell.width}f, ${cell.height}f);`);
-for (let element of elements)
-    console.log(`DrawText(e.Graphics, "${element.text.replace(/\"/g, "\"\"")}", ${element.x}f, ${element.y}f, ${element.width}f, ${element.height}f);`);
+//for (let cell of cells)
+    //console.log(`DrawRectangle(e.Graphics, ${cell.x}f, ${cell.y}f, ${cell.width}f, ${cell.height}f);`);
+//for (let element of elements)
+    //console.log(`DrawText(e.Graphics, "${element.text.replace(/\"/g, "\"\"")}", ${element.x}f, ${element.y}f, ${element.width}f, ${element.height}f);`);
 
         // Allocate each element to an "owning" cell.  An element may extend across several
         // cells (because the PDF parsing may join together multiple sections of text, using
