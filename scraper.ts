@@ -208,6 +208,19 @@ function rotate90Clockwise(rectangle: Rectangle) {
     rectangle.height = height;
 }
 
+// Rotates a rectangle 90 degrees anti-clockwise about the origin.
+
+function rotate90AntiClockwise(rectangle: Rectangle) {
+    let x = rectangle.y;
+    let y = -(rectangle.x + rectangle.width);
+    let width = rectangle.height;
+    let height = rectangle.width;
+    rectangle.x = x;
+    rectangle.y = y;
+    rectangle.width = width;
+    rectangle.height = height;
+}
+
 // Formats the text as a street.  If the text is not recognised as a street then undefined is
 // returned.
 
@@ -655,9 +668,7 @@ async function parsePdf(url: string) {
 
 // //        if (page.rotate === 90) {  // degrees
              for (let cell of cells) {
-                 rotate90Clockwise(cell);
-                 rotate90Clockwise(cell);
-                 rotate90Clockwise(cell);
+                 rotate90AntiClockwise(cell);
              }
 //             for (let element of elements) {
 //                 rotate90Clockwise(element);
