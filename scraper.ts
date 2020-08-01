@@ -668,21 +668,13 @@ async function parsePdf(url: string) {
 
         let viewport = await page.getViewport(1.0);
 
-// //        if (page.rotate === 90) {  // degrees
-             for (let cell of cells) {
-                 rotate90AntiClockwise(cell);
-                 cell.y = cell.y + viewport.height;
-             }
-//             for (let element of elements) {
-//                 rotate90Clockwise(element);
-                // [ element.y, element.width, element.height ] = [ element.y - element.width, element.height, element.width ];  // artificial adjustment (based on experimentation)
-//            }
-//        }
-
-// for (let cell of cells)
-//     console.log(`DrawRectangle(e.Graphics, ${cell.x}f, ${cell.y}f, ${cell.width}f, ${cell.height}f);`);
-// for (let element of elements)
-//     console.log(`DrawText(e.Graphics, "${element.text.replace(/\"/g, "\"\"")}", ${element.x}f, ${element.y}f, ${element.width}f, ${element.height}f);`);
+        // Experimentally determined that the following correctly aligns the grid lines with
+        // the text elements.
+        
+        for (let cell of cells) {
+            rotate90AntiClockwise(cell);
+            cell.y = cell.y + viewport.height;
+        }
 
         // Allocate each element to an "owning" cell.  An element may extend across several
         // cells (because the PDF parsing may join together multiple sections of text, using
@@ -727,12 +719,6 @@ async function parsePdf(url: string) {
             row.sort(rowCellComparer);
 
         // Find the heading cells.
-
-// for (let cell of cells) {
-//      console.log(`    cell [ ${cell.x}, ${cell.y}, ${cell.width}, ${cell.height}]`);
-//     for (let element of cell.elements)
-//         console.log(`        [${element.text}][${contains(cell, element)}][${element.x}, ${element.y}, ${element.width}, ${element.height}]`);
-// }
     
         let assessmentCell = cells.find(cell => cell.elements.some(element => element.text.trim() === "ASSESS" && contains(cell, element)));
         let applicationNumberCell = cells.find(cell => cell.elements.some(element => element.text.trim() === "DA NUMBER" && contains(cell, element)));
@@ -846,9 +832,6 @@ async function main() {
         selectedPdfUrls.push(pdfUrls[getRandom(0, pdfUrls.length)]);
     if (getRandom(0, 2) === 0)
         selectedPdfUrls.reverse();
-
-console.log("Forcing one PDF.");
-selectedPdfUrls = [ "https://www.wattlerange.sa.gov.au/__data/assets/pdf_file/0037/529669/Stats-January-2020.pdf" ];
 
     for (let pdfUrl of selectedPdfUrls) {
         console.log(`Parsing document: ${pdfUrl}`);
