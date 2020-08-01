@@ -185,7 +185,7 @@ function formatStreet(text) {
         let streetNameMatch = didyoumean(tokens.slice(-index).join(" "), Object.keys(StreetNames), { caseSensitive: false, returnType: "first-closest-match", thresholdType: "edit-distance", threshold: 1, trimSpace: true });
         if (streetNameMatch !== null) {
             let suburbNames = StreetNames[streetNameMatch];
-            tokens.splice(-index, index); // remove elements from the end of the array           
+            tokens.splice(-index, index); // remove elements from the end of the array
             return { streetName: (tokens.join(" ") + " " + streetNameMatch).trim(), suburbNames: suburbNames }; // reconstruct the street with the leading house number (and any other prefix text)
         }
     }
