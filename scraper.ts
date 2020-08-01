@@ -17,7 +17,7 @@ import * as didyoumean from "didyoumean2";
 
 sqlite3.verbose();
 
-const DevelopmentApplicationsUrl = "https://www.wattlerange.sa.gov.au/page.aspx?u=1158";
+const DevelopmentApplicationsUrl = "https://www.wattlerange.sa.gov.au/planning-and-business/Building-and-Planning-FAQ/development-approval-register";
 const CommentUrl = "mailto:council@wattlerange.sa.gov.au";
 
 declare const process: any;
@@ -58,7 +58,7 @@ async function insertRow(database, developmentApplication) {
                 console.error(error);
                 reject(error);
             } else {
-                console.log(`    Saved: application \"${developmentApplication.applicationNumber}\" with address \"${developmentApplication.address}\" and description \"${developmentApplication.description}\" into the database.`);
+                console.log(`    Saved application \"${developmentApplication.applicationNumber}\" with address \"${developmentApplication.address}\" and description \"${developmentApplication.description}\" to the database.`);
                 sqlStatement.finalize();  // releases any locks
                 resolve(row);
             }
@@ -193,6 +193,32 @@ function getHorizontalOverlapPercentage(rectangle1: Rectangle, rectangle2: Recta
     let unionWidth = Math.max(endX1, endX2) - Math.min(startX1, startX2);
 
     return (intersectionWidth * 100) / unionWidth;
+}
+
+// Rotates a rectangle 90 degrees clockwise about the origin.
+
+function rotate90Clockwise(rectangle: Rectangle) {
+    let x = -(rectangle.y + rectangle.height);
+    let y = rectangle.x;
+    let width = rectangle.height;
+    let height = rectangle.width;
+    rectangle.x = x;
+    rectangle.y = y;
+    rectangle.width = width;
+    rectangle.height = height;
+}
+
+// Rotates a rectangle 90 degrees anti-clockwise about the origin.
+
+function rotate90AntiClockwise(rectangle: Rectangle) {
+    let x = rectangle.y;
+    let y = -(rectangle.x + rectangle.width);
+    let width = rectangle.height;
+    let height = rectangle.width;
+    rectangle.x = x;
+    rectangle.y = y;
+    rectangle.width = width;
+    rectangle.height = height;
 }
 
 // Formats the text as a street.  If the text is not recognised as a street then undefined is
@@ -613,7 +639,7 @@ async function parseElements(page) {
 
 // Parses a PDF document.
 
-async function parsePdf(url: string) {
+async function parsePdf(url: string, shouldRotate: boolean) {
     let developmentApplications = [];
 
     // Read the PDF.
@@ -636,6 +662,21 @@ async function parsePdf(url: string) {
         // Construct elements based on the text in the PDF page.
 
         let elements = await parseElements(page);
+
+        if (page.rotate !== 0)  // degrees
+            console.log(`Page is rotated ${page.rotate}°.`);
+
+        if (shouldRotate) {
+            // Experimentally determined that the following rotation and translation correctly
+            // aligns the grid lines with the text elements in some PDFs.
+
+            console.log("Retrying with a rotation of 90°.")
+            let viewport = await page.getViewport(1.0);
+            for (let cell of cells) {
+                rotate90AntiClockwise(cell);
+                cell.y = cell.y + viewport.height;  // experimentally determined translation
+            }
+        }
 
         // Allocate each element to an "owning" cell.  An element may extend across several
         // cells (because the PDF parsing may join together multiple sections of text, using
@@ -680,7 +721,7 @@ async function parsePdf(url: string) {
             row.sort(rowCellComparer);
 
         // Find the heading cells.
-
+    
         let assessmentCell = cells.find(cell => cell.elements.some(element => element.text.trim() === "ASSESS" && contains(cell, element)));
         let applicationNumberCell = cells.find(cell => cell.elements.some(element => element.text.trim() === "DA NUMBER" && contains(cell, element)));
         let addressCell = cells.find(cell => cell.elements.some(element => element.text.trim() === "LOCATION" && contains(cell, element)));
@@ -713,8 +754,8 @@ async function parsePdf(url: string) {
             let rowAddressCell = row.find(cell => getHorizontalOverlapPercentage(cell, addressCell) > 90);
             let rowDescriptionCell = row.find(cell => getHorizontalOverlapPercentage(cell, descriptionCell) > 90);
 
-            let applicationNumber = rowApplicationNumberCell.elements.map(element => element.text).join("").trim();
-            let address = rowAddressCell.elements.map(element => element.text).join("").replace(/\s\s+/g, " ").trim();
+            let applicationNumber = (rowApplicationNumberCell === undefined) ? "" : rowApplicationNumberCell.elements.map(element => element.text).join("").trim();
+            let address = (rowAddressCell === undefined) ? "" : rowAddressCell.elements.map(element => element.text).join("").replace(/\s\s+/g, " ").trim();
             let description = (rowDescriptionCell === undefined) ? "" : rowDescriptionCell.elements.map(element => element.text).join("").replace(/\s\s+/g, " ").trim();
 
             if (!/[0-9]+\/[0-9]+\/[0-9]/.test(applicationNumber))  // an application number must be present
@@ -770,18 +811,18 @@ async function main() {
     let $ = cheerio.load(body);
     
     let pdfUrls: string[] = [];
-    for (let element of $("td.u6ListTD a[href$='.pdf']").get()) {
+    for (let element of $("li.link-listing__no-icon a").get()) {
         let pdfUrl = new urlparser.URL(element.attribs.href, DevelopmentApplicationsUrl);
-        if (!pdfUrls.some(url => url === pdfUrl.href))  // avoid duplicates
-            pdfUrls.push(pdfUrl.href);
+        if (pdfUrl.href.toLowerCase().includes(".pdf"))
+            if (!pdfUrls.some(url => url === pdfUrl.href))  // avoid duplicates
+                pdfUrls.push(pdfUrl.href);
     }
 
     if (pdfUrls.length === 0) {
         console.log("No PDF URLs were found on the page.");
         return;
     }
-
-    pdfUrls.reverse();
+    console.log(`Found ${pdfUrls.length} PDF URLs on the page.`);
 
     // Select the most recent PDF.  And randomly select one other PDF (avoid processing all PDFs
     // at once because this may use too much memory, resulting in morph.io terminating the current
@@ -790,13 +831,15 @@ async function main() {
     let selectedPdfUrls: string[] = [];
     selectedPdfUrls.push(pdfUrls.shift());
     if (pdfUrls.length > 0)
-        selectedPdfUrls.push(pdfUrls[getRandom(1, pdfUrls.length)]);
+        selectedPdfUrls.push(pdfUrls[getRandom(0, pdfUrls.length)]);
     if (getRandom(0, 2) === 0)
         selectedPdfUrls.reverse();
 
     for (let pdfUrl of selectedPdfUrls) {
         console.log(`Parsing document: ${pdfUrl}`);
-        let developmentApplications = await parsePdf(pdfUrl);
+        let developmentApplications = await parsePdf(pdfUrl, false);
+        if (developmentApplications.length === 0)
+            developmentApplications = await parsePdf(pdfUrl, true);  // retry with a 90° rotation (more recent PDFs seem to have this rotation)
         console.log(`Parsed ${developmentApplications.length} development application(s) from document: ${pdfUrl}`);
         console.log(`Inserting development applications into the database.`);
         for (let developmentApplication of developmentApplications)
