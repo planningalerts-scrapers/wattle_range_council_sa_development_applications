@@ -639,7 +639,7 @@ async function parseElements(page) {
 
 // Parses a PDF document.
 
-async function parsePdf(url: string) {
+async function parsePdf(url: string, shouldRotate: boolean) {
     let developmentApplications = [];
 
     // Read the PDF.
@@ -666,14 +666,16 @@ async function parsePdf(url: string) {
         if (page.rotate !== 0)  // degrees
             console.log(`Page is rotated ${page.rotate}°.`);
 
-        let viewport = await page.getViewport(1.0);
+        if (shouldRotate) {
+            // Experimentally determined that the following rotation and translation correctly
+            // aligns the grid lines with the text elements in some PDFs.
 
-        // Experimentally determined that the following correctly aligns the grid lines with
-        // the text elements.
-        
-        for (let cell of cells) {
-            rotate90AntiClockwise(cell);
-            cell.y = cell.y + viewport.height;
+            console.log("Applying a rotation of 90°.")
+            let viewport = await page.getViewport(1.0);
+            for (let cell of cells) {
+                rotate90AntiClockwise(cell);
+                cell.y = cell.y + viewport.height;  // experimentally determined translation
+            }
         }
 
         // Allocate each element to an "owning" cell.  An element may extend across several
@@ -835,7 +837,9 @@ async function main() {
 
     for (let pdfUrl of selectedPdfUrls) {
         console.log(`Parsing document: ${pdfUrl}`);
-        let developmentApplications = await parsePdf(pdfUrl);
+        let developmentApplications = await parsePdf(pdfUrl, false);
+        if (developmentApplications.length === 0)
+            developmentApplications = await parsePdf(pdfUrl, true);  // retry with a 90° rotation (more recent PDFs seem to have this rotation)
         console.log(`Parsed ${developmentApplications.length} development application(s) from document: ${pdfUrl}`);
         console.log(`Inserting development applications into the database.`);
         for (let developmentApplication of developmentApplications)
