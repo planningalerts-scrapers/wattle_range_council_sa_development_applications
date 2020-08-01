@@ -767,7 +767,7 @@ async function parsePdf(url: string) {
             let rowDescriptionCell = row.find(cell => getHorizontalOverlapPercentage(cell, descriptionCell) > 90);
 
             let applicationNumber = (rowApplicationNumberCell === undefined) ? "" : rowApplicationNumberCell.elements.map(element => element.text).join("").trim();
-            let address = rowAddressCell.elements.map(element => element.text).join("").replace(/\s\s+/g, " ").trim();
+            let address = (rowAddressCell === undefined) ? "" : rowAddressCell.elements.map(element => element.text).join("").replace(/\s\s+/g, " ").trim();
             let description = (rowDescriptionCell === undefined) ? "" : rowDescriptionCell.elements.map(element => element.text).join("").replace(/\s\s+/g, " ").trim();
 
             if (!/[0-9]+\/[0-9]+\/[0-9]/.test(applicationNumber))  // an application number must be present
