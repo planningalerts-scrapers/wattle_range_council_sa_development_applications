@@ -679,10 +679,10 @@ async function parsePdf(url: string) {
 //            }
 //        }
 
-//for (let cell of cells)
-    //console.log(`DrawRectangle(e.Graphics, ${cell.x}f, ${cell.y}f, ${cell.width}f, ${cell.height}f);`);
-//for (let element of elements)
-    //console.log(`DrawText(e.Graphics, "${element.text.replace(/\"/g, "\"\"")}", ${element.x}f, ${element.y}f, ${element.width}f, ${element.height}f);`);
+for (let cell of cells)
+    console.log(`DrawRectangle(e.Graphics, ${cell.x}f, ${cell.y}f, ${cell.width}f, ${cell.height}f);`);
+for (let element of elements)
+    console.log(`DrawText(e.Graphics, "${element.text.replace(/\"/g, "\"\"")}", ${element.x}f, ${element.y}f, ${element.width}f, ${element.height}f);`);
 
         // Allocate each element to an "owning" cell.  An element may extend across several
         // cells (because the PDF parsing may join together multiple sections of text, using
@@ -766,7 +766,7 @@ for (let cell of cells) {
             let rowAddressCell = row.find(cell => getHorizontalOverlapPercentage(cell, addressCell) > 90);
             let rowDescriptionCell = row.find(cell => getHorizontalOverlapPercentage(cell, descriptionCell) > 90);
 
-            let applicationNumber = rowApplicationNumberCell.elements.map(element => element.text).join("").trim();
+            let applicationNumber = (rowApplicationNumberCell === undefined) ? "" : rowApplicationNumberCell.elements.map(element => element.text).join("").trim();
             let address = rowAddressCell.elements.map(element => element.text).join("").replace(/\s\s+/g, " ").trim();
             let description = (rowDescriptionCell === undefined) ? "" : rowDescriptionCell.elements.map(element => element.text).join("").replace(/\s\s+/g, " ").trim();
 
