@@ -848,7 +848,7 @@ async function main() {
         selectedPdfUrls.reverse();
 
 console.log("Forcing one PDF.");
-selectedPdfUrls = [ "https://www.wattlerange.sa.gov.au/__data/assets/pdf_file/0026/719207/Stats-June-2020.pdf" ];
+selectedPdfUrls = [ "https://www.wattlerange.sa.gov.au/__data/assets/pdf_file/0037/529669/Stats-January-2020.pdf" ];
 
     for (let pdfUrl of selectedPdfUrls) {
         console.log(`Parsing document: ${pdfUrl}`);
