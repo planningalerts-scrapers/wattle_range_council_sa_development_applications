@@ -670,7 +670,7 @@ async function parsePdf(url: string, shouldRotate: boolean) {
             // Experimentally determined that the following rotation and translation correctly
             // aligns the grid lines with the text elements in some PDFs.
 
-            console.log("Applying a rotation of 90°.")
+            console.log("Retrying with a rotation of 90°.")
             let viewport = await page.getViewport(1.0);
             for (let cell of cells) {
                 rotate90AntiClockwise(cell);
