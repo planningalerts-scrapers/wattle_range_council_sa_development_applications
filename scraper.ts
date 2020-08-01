@@ -679,10 +679,10 @@ async function parsePdf(url: string) {
 //            }
 //        }
 
-for (let cell of cells)
-    console.log(`DrawRectangle(e.Graphics, ${cell.x}f, ${cell.y}f, ${cell.width}f, ${cell.height}f);`);
-for (let element of elements)
-    console.log(`DrawText(e.Graphics, "${element.text.replace(/\"/g, "\"\"")}", ${element.x}f, ${element.y}f, ${element.width}f, ${element.height}f);`);
+// for (let cell of cells)
+//     console.log(`DrawRectangle(e.Graphics, ${cell.x}f, ${cell.y}f, ${cell.width}f, ${cell.height}f);`);
+// for (let element of elements)
+//     console.log(`DrawText(e.Graphics, "${element.text.replace(/\"/g, "\"\"")}", ${element.x}f, ${element.y}f, ${element.width}f, ${element.height}f);`);
 
         // Allocate each element to an "owning" cell.  An element may extend across several
         // cells (because the PDF parsing may join together multiple sections of text, using
@@ -728,11 +728,11 @@ for (let element of elements)
 
         // Find the heading cells.
 
-for (let cell of cells) {
-    console.log(`    cell [ ${cell.x}, ${cell.y}, ${cell.width}, ${cell.height}]`);
-    for (let element of cell.elements)
-        console.log(`        [${element.text}][${contains(cell, element)}][${element.x}, ${element.y}, ${element.width}, ${element.height}]`);
-}
+// for (let cell of cells) {
+//      console.log(`    cell [ ${cell.x}, ${cell.y}, ${cell.width}, ${cell.height}]`);
+//     for (let element of cell.elements)
+//         console.log(`        [${element.text}][${contains(cell, element)}][${element.x}, ${element.y}, ${element.width}, ${element.height}]`);
+// }
     
         let assessmentCell = cells.find(cell => cell.elements.some(element => element.text.trim() === "ASSESS" && contains(cell, element)));
         let applicationNumberCell = cells.find(cell => cell.elements.some(element => element.text.trim() === "DA NUMBER" && contains(cell, element)));
